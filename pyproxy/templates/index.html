@@ -1,0 +1,64 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>PyProxy - Webプロキシサービス</title>
+    <link rel="stylesheet" href="/static/css/style.css">
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>PyProxy</h1>
+            <p class="subtitle">FastAPIベースのWebプロキシサービス</p>
+        </header>
+
+        <main>
+            <section class="proxy-form">
+                <h2>Webサイトへアクセス</h2>
+                <form action="/submit" method="post">
+                    <div class="form-group">
+                        <input 
+                            type="url" 
+                            name="url" 
+                            id="url" 
+                            placeholder="https://example.com" 
+                            required
+                            autocomplete="off"
+                            autofocus
+                        >
+                        <button type="submit">アクセス</button>
+                    </div>
+                    <div class="form-hint">
+                        URLを入力してください（例: https://example.com）
+                    </div>
+                </form>
+            </section>
+
+            <section class="info">
+                <h2>このサービスについて</h2>
+                <p>PyProxyは、入力されたURLに対してサーバーが代わりにリクエストを行い、取得したコンテンツを中継するサービスです。</p>
+                <p>プライバシー保護のため、広告や追跡スクリプトを自動的にブロックします。</p>
+            </section>
+
+            {% if allowed_domains %}
+            <section class="whitelist">
+                <h2>アクセス可能なドメイン</h2>
+                <p>以下のドメインのみアクセスが許可されています：</p>
+                <ul>
+                    {% for domain in allowed_domains %}
+                    <li>{{ domain }}</li>
+                    {% endfor %}
+                </ul>
+            </section>
+            {% endif %}
+        </main>
+
+        <footer>
+            <p>&copy; 2025 PyProxy. プライバシーを大切に。</p>
+        </footer>
+    </div>
+    
+    <script src="/static/js/main.js"></script>
+</body>
+</html>

@@ -1,0 +1,58 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>エラー {{ status_code }} - PyProxy</title>
+    <link rel="stylesheet" href="/static/css/style.css">
+</head>
+<body>
+    <div class="container error-page">
+        <header>
+            <h1>PyProxy</h1>
+            <p class="subtitle">FastAPIベースのWebプロキシサービス</p>
+        </header>
+
+        <main>
+            <section class="error-container">
+                <h2>エラー {{ status_code }}</h2>
+                <div class="error-message">
+                    <p>{{ detail }}</p>
+                </div>
+                <div class="error-actions">
+                    <a href="/" class="button">ホームに戻る</a>
+                </div>
+            </section>
+
+            <section class="error-help">
+                <h3>考えられる原因</h3>
+                <ul>
+                    {% if status_code == 400 %}
+                        <li>入力されたURLが無効です。正しいURLを入力してください。</li>
+                        <li>URLの形式が正しくありません。「https://」で始まるURLを入力してください。</li>
+                    {% elif status_code == 403 %}
+                        <li>アクセスしようとしたドメインはホワイトリストに登録されていません。</li>
+                        <li>許可されたドメインのみアクセス可能です。</li>
+                    {% elif status_code == 404 %}
+                        <li>指定されたページが見つかりませんでした。</li>
+                        <li>URLが正しいか確認してください。</li>
+                    {% elif status_code == 500 %}
+                        <li>サーバー内部でエラーが発生しました。</li>
+                        <li>しばらく待ってから再度お試しください。</li>
+                    {% elif status_code == 502 %}
+                        <li>外部サイトへの接続に失敗しました。</li>
+                        <li>サイトが一時的に利用できないか、存在しない可能性があります。</li>
+                    {% else %}
+                        <li>予期せぬエラーが発生しました。</li>
+                        <li>別のURLで試してみてください。</li>
+                    {% endif %}
+                </ul>
+            </section>
+        </main>
+
+        <footer>
+            <p>&copy; 2025 PyProxy. プライバシーを大切に。</p>
+        </footer>
+    </div>
+</body>
+</html>
