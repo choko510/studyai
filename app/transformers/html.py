@@ -158,7 +158,7 @@ def transform_tag_attributes(tag: Tag, attributes: List[str], base_url: str) -> 
                 tag[attr] = transform_srcset(attr_value, base_url)
             else:
                 # data:URLやjavascript:などの特殊URLはスキップ
-                if attr_value and not attr_value.startswith(('data:', 'javascript:', 'mailto:', 'tel:', '#')):
+                if attr_value and not attr_value.startswith(('data:', 'javascript:', 'mailto:', 'tel:')):
                     full_url = join_url(base_url, attr_value)
                     tag[attr] = create_proxy_url(full_url)
 

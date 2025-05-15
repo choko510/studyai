@@ -40,6 +40,9 @@ async def process_response(
     
     # レスポンスヘッダー
     headers = dict(response.headers)
+    # 不要なエンコーディング・長さヘッダーを削除
+    if should_transform:
+        headers = {k: v for k, v in headers.items() if k.lower() not in ("content-encoding","content-length")}
     
     # コンテンツタイプを取得
     content_type = get_content_type(headers)
@@ -92,6 +95,8 @@ def create_fastapi_response(
     Returns:
         Response: FastAPIのレスポンスオブジェクト
     """
+    # 不要なエンコーディング・長さ・転送ヘッダーを削除
+    headers = {k: v for k, v in headers.items() if k.lower() not in ("content-encoding","content-length","transfer-encoding")}
     return Response(
         content=content,
         status_code=status_code,

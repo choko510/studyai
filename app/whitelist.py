@@ -41,6 +41,9 @@ class DomainWhitelist:
         Returns:
             bool: 許可されている場合はTrue、そうでない場合はFalse
         """
+        # 全ドメイン許可設定（ワイルドカード）
+        if "*" in self._allowed_domains:
+            return True
         if not self._allowed_domains:
             return True  # ホワイトリストが空の場合は全て許可
             
