@@ -184,11 +184,77 @@ def transform_api_calls(js_code: str, base_url: str) -> str:
     Returns:
         str: 変換されたJavaScriptコード
     """
+    # リダイレクト検出パターン
+    redirect_patterns = [
+        # window.location.href = "..."
+        r'(window\.location\.href\s*=\s*[\'"])(.*?)([\'"])',
+        # location.href = "..."
+        r'(location\.href\s*=\s*[\'"])(.*?)([\'"])',
+        # window.location = "..."
+        r'(window\.location\s*=\s*[\'"])(.*?)([\'"])',
+        # location = "..."
+        r'(location\s*=\s*[\'"])(.*?)([\'"])',
+        # location.replace("...")
+        r'(location\.replace\s*\(\s*[\'"])(.*?)([\'"])',
+        # location.assign("...")
+        r'(location\.assign\s*\(\s*[\'"])(.*?)([\'"])',
+        # window.open("...")
+        r'(window\.open\s*\(\s*[\'"])(.*?)([\'"])'
+    ]
+    
+    # リダイレクト処理を変換
+    for pattern in redirect_patterns:
+        js_code = re.sub(
+            pattern,
+            lambda m: m.group(1) + transform_url(m.group(2), base_url) + m.group(3),
+            js_code
+        )
+    
     # APIエンドポイント呼び出しのオーバーライド
     overrides = """
-    // PyProxy: XMLHttpRequestとfetchのオーバーライド
+    // PyProxy: URL操作関連APIのオーバーライド
     (function() {
         if (window.__pyproxy_patched) return;
+        
+        // ベースURL設定
+        const BASE_URL = "%s";
+        
+        try {
+            // オリジナルのlocation
+            const originalLocation = window.location;
+            
+            // オリジナルのlocation操作メソッド
+            const originalAssign = originalLocation.assign;
+            const originalReplace = originalLocation.replace;
+            
+            // location.assign/replaceのオーバーライド
+            originalLocation.assign = function(url) {
+                const absoluteUrl = new URL(url, BASE_URL).href;
+                const proxyUrl = "/proxy?url=" + encodeURIComponent(absoluteUrl);
+                return originalAssign.call(originalLocation, proxyUrl);
+            };
+            
+            originalLocation.replace = function(url) {
+                const absoluteUrl = new URL(url, BASE_URL).href;
+                const proxyUrl = "/proxy?url=" + encodeURIComponent(absoluteUrl);
+                return originalReplace.call(originalLocation, proxyUrl);
+            };
+            
+            // オリジナルの関数を保存
+            const originalOpen = window.open;
+            
+            // window.openのオーバーライド
+            window.open = function(url, target, features) {
+                if (url) {
+                    const absoluteUrl = new URL(url, BASE_URL).href;
+                    const proxyUrl = "/proxy?url=" + encodeURIComponent(absoluteUrl);
+                    return originalOpen.call(window, proxyUrl, target, features);
+                }
+                return originalOpen.apply(this, arguments);
+            };
+        } catch (e) {
+            console.warn("PyProxy: リダイレクト関数のオーバーライドに失敗しました", e);
+        }
         
         // 元のXMLHttpRequestを保存
         var originalXHR = window.XMLHttpRequest;
@@ -202,7 +268,7 @@ def transform_api_calls(js_code: str, base_url: str) -> str:
                 // 相対URLを絶対URLに変換
                 var absoluteUrl;
                 try {
-                    absoluteUrl = new URL(url, window.location.href).href;
+                    absoluteUrl = new URL(url, BASE_URL).href;
                 } catch (e) {
                     absoluteUrl = url;
                 }
@@ -236,7 +302,7 @@ def transform_api_calls(js_code: str, base_url: str) -> str:
                     // 相対URLを絶対URLに変換
                     var absoluteUrl;
                     try {
-                        absoluteUrl = new URL(url, window.location.href).href;
+                        absoluteUrl = new URL(url, BASE_URL).href;
                     } catch (e) {
                         absoluteUrl = url;
                     }
@@ -267,9 +333,9 @@ def transform_api_calls(js_code: str, base_url: str) -> str:
         }
         
         window.__pyproxy_patched = true;
-        console.info("PyProxy: XMLHttpRequestとfetchをオーバーライドしました");
+        console.info("PyProxy: URL操作APIをオーバーライドしました");
     })();
-    """
+    """ % base_url
     
     # すでにオーバーライドコードが含まれていなければ追加
     if "window.__pyproxy_patched" not in js_code:

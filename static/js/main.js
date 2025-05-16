@@ -9,6 +9,9 @@ document.addEventListener('DOMContentLoaded', function() {
     if (urlForm && urlInput) {
         // フォーム送信前の処理
         urlForm.addEventListener('submit', function(event) {
+            // フォームのデフォルト送信をキャンセル（POSTを防止）
+            event.preventDefault();
+            
             // URLを整形 
             let url = urlInput.value.trim();
             
@@ -20,10 +23,16 @@ document.addEventListener('DOMContentLoaded', function() {
             
             // URLバリデーション
             if (!isValidUrl(url)) {
-                event.preventDefault();
                 showError('無効なURLです。正しいURLを入力してください。');
                 return false;
             }
+            
+            // エンコードされたURLでGETリクエストを作成
+            const encodedUrl = encodeURIComponent(url);
+            const proxyUrl = `/proxy?url=${encodedUrl}`;
+            
+            // GETリクエストとしてリダイレクト
+            window.location.href = proxyUrl;
         });
         
         // フォーカス時にURLを選択
@@ -37,7 +46,12 @@ document.addEventListener('DOMContentLoaded', function() {
             example.addEventListener('click', function(event) {
                 event.preventDefault();
                 urlInput.value = this.getAttribute('data-url');
-                urlForm.submit();
+                
+                // 例のURLでもGETリクエストを直接作成
+                const url = this.getAttribute('data-url');
+                const encodedUrl = encodeURIComponent(url);
+                const proxyUrl = `/proxy?url=${encodedUrl}`;
+                window.location.href = proxyUrl;
             });
         });
     }

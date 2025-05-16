@@ -5,6 +5,8 @@ FastAPIのエンドポイントとして機能
 from typing import Optional
 from fastapi import Request, Response, HTTPException, Depends
 from fastapi.responses import RedirectResponse, HTMLResponse
+from fastapi.templating import Jinja2Templates
+import os
 
 from app.utils.helpers import (
     is_valid_url, normalize_url, create_proxy_url, get_original_url,
@@ -16,6 +18,10 @@ from app.proxy.response import (
     process_response, get_cached_response, create_response_from_cache
 )
 from app.config import CACHE_ENABLED
+
+# テンプレートの設定
+BASE_DIR = os.path.dirname(os.path.dirname(os.path.dirname(__file__)))
+templates = Jinja2Templates(directory=os.path.join(BASE_DIR, "templates"))
 
 async def proxy_handler(request: Request, url: Optional[str] = None) -> Response:
     """
@@ -37,36 +43,63 @@ async def proxy_handler(request: Request, url: Optional[str] = None) -> Response
     
     # URLの有効性を確認
     if not is_valid_url(target_url):
-        raise HTTPException(status_code=400, detail="無効なURLです")
+        return templates.TemplateResponse(
+            "error.html",
+            {
+                "request": request,
+                "status_code": 400,
+                "detail": "無効なURLです"
+            },
+            status_code=400
+        )
     
     # ドメインがホワイトリストに含まれているか確認
     domain = get_domain(target_url)
     if not whitelist.is_allowed(target_url):
-        return HTMLResponse(
-            content=f"""
-            <html>
-                <head><title>アクセス拒否</title></head>
-                <body>
-                    <h1>アクセス拒否</h1>
-                    <p>ドメイン '{domain}' へのアクセスは許可されていません。</p>
-                    <p><a href="/">ホームに戻る</a></p>
-                </body>
-            </html>
-            """,
+        return templates.TemplateResponse(
+            "error.html",
+            {
+                "request": request,
+                "status_code": 403,
+                "detail": f"ドメイン '{domain}' へのアクセスは許可されていません"
+            },
             status_code=403
         )
     
-    # キャッシュからレスポンスを取得
-    if CACHE_ENABLED:
-        cached_data = await get_cached_response(target_url)
-        if cached_data:
-            return await create_response_from_cache(cached_data)
-    
-    # 外部サイトへリクエストを転送
-    response, normalized_url = await forward_request(target_url, request)
-    
-    # レスポンスを処理して変換
-    return await process_response(response, normalized_url)
+    try:
+        # キャッシュからレスポンスを取得
+        if CACHE_ENABLED:
+            cached_data = await get_cached_response(target_url)
+            if cached_data:
+                return await create_response_from_cache(cached_data)
+        
+        # 外部サイトへリクエストを転送
+        response, normalized_url = await forward_request(target_url, request)
+        
+        # レスポンスを処理して変換
+        return await process_response(response, normalized_url)
+    except HTTPException as exc:
+        # エラーテンプレートを返す
+        return templates.TemplateResponse(
+            "error.html",
+            {
+                "request": request,
+                "status_code": exc.status_code,
+                "detail": exc.detail
+            },
+            status_code=exc.status_code
+        )
+    except Exception as e:
+        # 予期せぬエラー
+        return templates.TemplateResponse(
+            "error.html",
+            {
+                "request": request,
+                "status_code": 500,
+                "detail": f"サーバーエラーが発生しました: {str(e)}"
+            },
+            status_code=500
+        )
 
 async def handle_form_submission(request: Request) -> Response:
     """

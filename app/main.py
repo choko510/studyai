@@ -48,6 +48,12 @@ async def submit_url(request: Request):
     return await handle_form_submission(request)
 
 @app.get("/proxy")
+@app.post("/proxy")
+@app.put("/proxy")
+@app.delete("/proxy")
+@app.patch("/proxy")
+@app.options("/proxy")
+@app.head("/proxy")
 async def proxy(request: Request, url: Optional[str] = None):
     """
     プロキシエンドポイント

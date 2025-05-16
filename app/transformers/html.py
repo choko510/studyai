@@ -79,12 +79,10 @@ async def transform_html(html_content: bytes, base_url: str) -> str:
         # HTML解析
         soup = BeautifulSoup(html_text, 'lxml')
         
-        # <base>タグの処理
+        # <base>タグの処理 - 存在する場合は削除して独自の処理に任せる
         base_tag = soup.find('base')
-        if base_tag and base_tag.get('href'):
-            # baseタグのhrefをプロキシURLに書き換え
-            base_href = join_url(base_url, base_tag['href'])
-            base_tag['href'] = create_proxy_url(base_href)
+        if base_tag:
+            base_tag.extract()
         
         # メタリフレッシュの処理
         meta_refresh = soup.find('meta', attrs={'http-equiv': lambda x: x and x.lower() == 'refresh'})
@@ -128,7 +126,7 @@ async def transform_html(html_content: bytes, base_url: str) -> str:
             if any(re.search(pattern, src, re.IGNORECASE) for pattern in TRACKING_PATTERNS):
                 script.extract()  # スクリプトを削除
         
-        # プロキシヘルパースクリプトの追加
+        # プロキシヘルパースクリプトの追加（改善版）
         add_proxy_helper_script(soup, base_url)
         
         # 変換されたHTMLを返す
@@ -266,6 +264,87 @@ def add_proxy_helper_script(soup: BeautifulSoup, base_url: str) -> None:
     helper_script = f"""
     <script>
     (function() {{
+        // ベースURL設定 - すべての相対パスの解決に使用
+        const BASE_URL = "{base_url}";
+        
+        // location関連のオーバーライド
+        try {{
+            // オリジナルのlocation
+            const originalLocation = window.location;
+            
+            // locationプロパティへのアクセスを監視するプロキシ
+            const locationProxy = new Proxy(originalLocation, {{
+                get: function(target, prop) {{
+                    if (prop === 'href' || prop === 'pathname' || prop === 'search' || prop === 'hash') {{
+                        return target[prop];
+                    }}
+                    return target[prop];
+                }},
+                set: function(target, prop, value) {{
+                    if (prop === 'href') {{
+                        // 相対URLを絶対URLに変換
+                        const absoluteUrl = new URL(value, BASE_URL).href;
+                        
+                        // プロキシURL経由でリダイレクト
+                        const proxyUrl = "/proxy?url=" + encodeURIComponent(absoluteUrl);
+                        originalLocation.href = proxyUrl;
+                        return true;
+                    }}
+                    target[prop] = value;
+                    return true;
+                }}
+            }});
+            
+            // グローバルlocationオブジェクトを置き換え
+            try {{
+                Object.defineProperty(window, 'location', {{
+                    value: locationProxy,
+                    writable: false,
+                    configurable: false
+                }});
+            }} catch (e) {{
+                console.warn('PyProxy: locationオブジェクトの置き換えに失敗しました', e);
+            }}
+            
+            // リダイレクト関数のオーバーライド
+            const originalAssign = originalLocation.assign;
+            originalLocation.assign = function(url) {{
+                const absoluteUrl = new URL(url, BASE_URL).href;
+                const proxyUrl = "/proxy?url=" + encodeURIComponent(absoluteUrl);
+                return originalAssign.call(originalLocation, proxyUrl);
+            }};
+            
+            const originalReplace = originalLocation.replace;
+            originalLocation.replace = function(url) {{
+                const absoluteUrl = new URL(url, BASE_URL).href;
+                const proxyUrl = "/proxy?url=" + encodeURIComponent(absoluteUrl);
+                return originalReplace.call(originalLocation, proxyUrl);
+            }};
+            
+            // History APIのオーバーライド
+            const originalPushState = history.pushState;
+            history.pushState = function(state, title, url) {{
+                if (url) {{
+                    const absoluteUrl = new URL(url, BASE_URL).href;
+                    const proxyUrl = "/proxy?url=" + encodeURIComponent(absoluteUrl);
+                    return originalPushState.call(history, state, title, proxyUrl);
+                }}
+                return originalPushState.apply(this, arguments);
+            }};
+            
+            const originalReplaceState = history.replaceState;
+            history.replaceState = function(state, title, url) {{
+                if (url) {{
+                    const absoluteUrl = new URL(url, BASE_URL).href;
+                    const proxyUrl = "/proxy?url=" + encodeURIComponent(absoluteUrl);
+                    return originalReplaceState.call(history, state, title, proxyUrl);
+                }}
+                return originalReplaceState.apply(this, arguments);
+            }};
+        }} catch (e) {{
+            console.error('PyProxy: リダイレクト処理のオーバーライドに失敗しました', e);
+        }}
+        
         // 元のXMLHttpRequestを保存
         var originalXHR = window.XMLHttpRequest;
         
@@ -276,7 +355,12 @@ def add_proxy_helper_script(soup: BeautifulSoup, base_url: str) -> None:
             
             xhr.open = function(method, url, async, user, password) {{
                 // 相対URLを絶対URLに変換
-                var absoluteUrl = new URL(url, "{base_url}").href;
+                var absoluteUrl;
+                try {{
+                    absoluteUrl = new URL(url, BASE_URL).href;
+                }} catch (e) {{
+                    absoluteUrl = url;
+                }}
                 
                 // プロキシURLを作成
                 var proxyUrl = "/proxy?url=" + encodeURIComponent(absoluteUrl);
@@ -292,47 +376,79 @@ def add_proxy_helper_script(soup: BeautifulSoup, base_url: str) -> None:
         var originalFetch = window.fetch;
         
         // fetchをオーバーライド
-        window.fetch = function(resource, init) {{
-            var url;
-            
-            if (typeof resource === 'string') {{
-                url = resource;
-            }} else if (resource instanceof Request) {{
-                url = resource.url;
-                resource = new Request(resource, init);
-            }}
-            
-            if (url) {{
-                // 相対URLを絶対URLに変換
-                var absoluteUrl = new URL(url, "{base_url}").href;
-                
-                // プロキシURLを作成
-                var proxyUrl = "/proxy?url=" + encodeURIComponent(absoluteUrl);
+        if (originalFetch) {{
+            window.fetch = function(resource, init) {{
+                var url;
                 
                 if (typeof resource === 'string') {{
-                    return originalFetch.call(this, proxyUrl, init);
-                }} else {{
-                    resource = new Request(proxyUrl, {{
-                        method: resource.method,
-                        headers: resource.headers,
-                        body: resource.body,
-                        mode: resource.mode,
-                        credentials: resource.credentials,
-                        cache: resource.cache,
-                        redirect: resource.redirect,
-                        referrer: resource.referrer,
-                        integrity: resource.integrity
-                    }});
-                    return originalFetch.call(this, resource);
+                    url = resource;
+                }} else if (resource instanceof Request) {{
+                    url = resource.url;
+                    resource = new Request(resource, init);
+                }}
+                
+                if (url) {{
+                    // 相対URLを絶対URLに変換
+                    var absoluteUrl;
+                    try {{
+                        absoluteUrl = new URL(url, BASE_URL).href;
+                    }} catch (e) {{
+                        absoluteUrl = url;
+                    }}
+                    
+                    // プロキシURLを作成
+                    var proxyUrl = "/proxy?url=" + encodeURIComponent(absoluteUrl);
+                    
+                    if (typeof resource === 'string') {{
+                        return originalFetch.call(this, proxyUrl, init);
+                    }} else {{
+                        resource = new Request(proxyUrl, {{
+                            method: resource.method,
+                            headers: resource.headers,
+                            body: resource.body,
+                            mode: resource.mode,
+                            credentials: resource.credentials,
+                            cache: resource.cache,
+                            redirect: resource.redirect,
+                            referrer: resource.referrer,
+                            integrity: resource.integrity
+                        }});
+                        return originalFetch.call(this, resource);
+                    }}
+                }}
+                
+                return originalFetch.apply(this, arguments);
+            }};
+        }}
+        
+        // オープン関数のオーバーライド
+        const originalOpen = window.open;
+        window.open = function(url, target, features) {{
+            if (url) {{
+                try {{
+                    const absoluteUrl = new URL(url, BASE_URL).href;
+                    const proxyUrl = "/proxy?url=" + encodeURIComponent(absoluteUrl);
+                    return originalOpen.call(window, proxyUrl, target, features);
+                }} catch (e) {{
+                    console.warn('PyProxy: window.openのオーバーライドに失敗しました', e);
                 }}
             }}
-            
-            return originalFetch.apply(this, arguments);
+            return originalOpen.apply(this, arguments);
         }};
+        
+        console.info("PyProxy: URL操作をオーバーライドしました");
     }})();
     </script>
     """
     
-    # スクリプトをHTMLに挿入
+    # スクリプトをHTMLに挿入（head要素の最初に配置）
     script_tag = BeautifulSoup(helper_script, 'lxml').script
-    soup.head.append(script_tag) if soup.head else soup.append(script_tag)
+    if soup.head:
+        soup.head.insert(0, script_tag)
+    else:
+        head_tag = soup.new_tag('head')
+        head_tag.append(script_tag)
+        if soup.html:
+            soup.html.insert(0, head_tag)
+        else:
+            soup.append(head_tag)
