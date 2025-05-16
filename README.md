@@ -1,7 +1,3 @@
-# PyProxy
-
-FastAPIベースのWebプロキシサーバー。URLを入力するだけで、サーバーを介して外部Webサイトにアクセスできます。
-
 ## 主な機能
 
 - ドメインホワイトリストによるアクセス制限
@@ -13,10 +9,6 @@ FastAPIベースのWebプロキシサーバー。URLを入力するだけで、�
 ## インストール方法
 
 ```bash
-# リポジトリのクローン
-git clone https://github.com/yourusername/pyproxy.git
-cd pyproxy
-
 # 依存関係のインストール
 pip install -r requirements.txt
 ```
@@ -44,15 +36,3 @@ ALLOWED_DOMAINS=example.com,wikipedia.org
 CACHE_ENABLED=True
 CACHE_EXPIRY=3600  # 秒単位
 ```
-
-## ドメインホワイトリスト
-
-`app/whitelist.py`でアクセスを許可するドメインを設定できます。デフォルトでは一部の一般的なドメインのみが許可されています。
-
-## 貢献
-
-問題の報告やプルリクエストは大歓迎です。
-
-## ライセンス
-
-[MIT License](LICENSE)
