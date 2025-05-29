@@ -1,1 +1,0 @@
-# PyProxy application package
