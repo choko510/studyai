@@ -29,6 +29,9 @@ const logger = winston.createLogger({
 const app = express();
 const PORT = process.env.PORT || 3000;
 
+// Trust proxy 設定（レート制限の前に設定）
+app.set('trust proxy', 1);
+
 // Bare サーバー作成
 const bareServer = createBareServer('/bare/');
 
@@ -65,7 +68,11 @@ const limiter = rateLimit({
   max: 1000, // 最大1000リクエスト
   message: 'リクエストが多すぎます。しばらく待ってから再試行してください。',
   standardHeaders: true,
-  legacyHeaders: false
+  legacyHeaders: false,
+  skip: (req) => {
+    // ローカルホストはスキップ
+    return req.ip === '127.0.0.1' || req.ip === '::1';
+  }
 });
 app.use(limiter);
 
@@ -79,21 +86,72 @@ app.use(express.static(path.join(__dirname, 'public'), {
   etag: true
 }));
 
-// Ultraviolet 静的ファイル
-app.use('/uv/', express.static(path.join(__dirname, 'node_modules/@titaniumnetwork-dev/ultraviolet/dist/')));
+// Ultraviolet 静的ファイル（node_modulesが存在しない場合のフォールバック）
+const uvPath = path.join(__dirname, 'node_modules/@titaniumnetwork-dev/ultraviolet/dist/');
+const fs = require('fs');
 
-// ミドルウェア読み込み
-const adblockMiddleware = require('./src/middleware/adblock');
-const securityMiddleware = require('./src/middleware/security');
-const useragentMiddleware = require('./src/middleware/useragent');
+if (fs.existsSync(uvPath)) {
+  app.use('/uv/', express.static(uvPath));
+} else {
+  // フォールバック: Ultravioletファイルが見つからない場合
+  app.get('/uv/*', (req, res) => {
+    res.status(404).json({
+      error: 'Ultravioletファイルが見つかりません',
+      message: 'npm installを実行してください',
+      missing: req.path
+    });
+  });
+}
 
-// カスタムミドルウェア適用
-app.use('/service/', adblockMiddleware);
-app.use('/service/', securityMiddleware);
-app.use('/service/', useragentMiddleware);
+// カスタムミドルウェアを条件付きで読み込み
+let adblockMiddleware, securityMiddleware, useragentMiddleware;
 
-// ルート設定
-app.use('/api/', require('./src/routes/api'));
+try {
+  adblockMiddleware = require('./src/middleware/adblock');
+  securityMiddleware = require('./src/middleware/security');
+  useragentMiddleware = require('./src/middleware/useragent');
+  
+  // ミドルウェア適用
+  app.use('/service/', adblockMiddleware);
+  app.use('/service/', securityMiddleware);
+  app.use('/service/', useragentMiddleware);
+  
+  logger.info('カスタムミドルウェアを読み込みました');
+} catch (error) {
+  logger.warn('カスタムミドルウェアの読み込みに失敗しました:', error.message);
+}
+
+// API ルートを条件付きで読み込み
+try {
+  app.use('/api/', require('./src/routes/api'));
+  logger.info('APIルートを読み込みました');
+} catch (error) {
+  logger.warn('APIルートの読み込みに失敗しました:', error.message);
+  
+  // フォールバックAPI
+  app.get('/api/status', (req, res) => {
+    res.json({
+      status: 'online',
+      uptime: Math.floor(process.uptime()),
+      memory: process.memoryUsage(),
+      nodeVersion: process.version,
+      timestamp: new Date().toISOString()
+    });
+  });
+  
+  app.get('/api/config', (req, res) => {
+    res.json({
+      features: {
+        adblock: false,
+        security: false,
+        userAgent: false,
+        javascript: true
+      },
+      version: '1.0.0',
+      build: 'fallback'
+    });
+  });
+}
 
 // メインページ
 app.get('/', (req, res) => {
@@ -105,11 +163,48 @@ app.get('/sw.js', (req, res) => {
   res.sendFile(path.join(__dirname, 'public/sw.js'));
 });
 
+// プロキシリクエストの基本処理
+app.use('/service/', (req, res, next) => {
+  // 基本的なプロキシ処理
+  const encodedUrl = req.url.substring(1); // /service/ を除去
+  
+  if (!encodedUrl) {
+    return res.status(400).json({
+      error: 'URLが指定されていません',
+      usage: '/service/[encoded-url]'
+    });
+  }
+  
+  try {
+    // 簡易的なBase64デコード
+    const targetUrl = Buffer.from(encodedUrl, 'base64').toString('utf-8');
+    
+    // 基本的なURL検証
+    new URL(targetUrl);
+    
+    // プロキシ処理をBareサーバーに委譲
+    if (bareServer.shouldRoute(req)) {
+      bareServer.routeRequest(req, res);
+    } else {
+      res.status(500).json({
+        error: 'プロキシ処理に失敗しました',
+        url: targetUrl
+      });
+    }
+  } catch (error) {
+    res.status(400).json({
+      error: 'URLのデコードに失敗しました',
+      details: error.message
+    });
+  }
+});
+
 // 404 ハンドラー
 app.use((req, res) => {
   res.status(404).json({
     error: 'ページが見つかりません',
-    message: '要求されたリソースは存在しません'
+    message: '要求されたリソースは存在しません',
+    path: req.path
   });
 });
 
@@ -126,7 +221,7 @@ app.use((error, req, res, next) => {
 
 // サーバー起動
 const server = app.listen(PORT, () => {
-  logger.info(`🚀 Ultraviolet Proxy サーバーが起動しました`);
+  logger.info('🚀 Ultraviolet Proxy サーバーが起動しました');
   logger.info(`📡 ポート: ${PORT}`);
   logger.info(`🌐 URL: http://localhost:${PORT}`);
   logger.info(`🔧 モード: ${process.env.NODE_ENV || 'development'}`);
@@ -165,6 +260,17 @@ process.on('SIGINT', () => {
     logger.info('サーバーが正常に終了しました');
     process.exit(0);
   });
+});
+
+// 未処理の例外をキャッチ
+process.on('uncaughtException', (error) => {
+  logger.error('未処理の例外:', error);
+  process.exit(1);
+});
+
+process.on('unhandledRejection', (reason, promise) => {
+  logger.error('未処理のPromise拒否:', reason);
+  process.exit(1);
 });
 
 module.exports = app;

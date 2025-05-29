@@ -39,6 +39,8 @@ class UltravioletProxy {
     
     async init() {
         try {
+            console.log('Ultraviolet Proxy initializing...');
+            
             // ローディング画面を表示
             this.showLoading();
             
@@ -48,7 +50,7 @@ class UltravioletProxy {
             // イベントリスナーを設定
             this.setupEventListeners();
             
-            // Service Worker を登録
+            // Service Worker を登録（条件付き）
             await this.registerServiceWorker();
             
             // テーマを適用
@@ -61,11 +63,13 @@ class UltravioletProxy {
             setTimeout(() => {
                 this.hideLoading();
                 this.isReady = true;
+                console.log('Ultraviolet Proxy ready!');
             }, 1000);
             
         } catch (error) {
             console.error('初期化エラー:', error);
-            this.showError('アプリケーションの初期化に失敗しました');
+            this.showError('アプリケーションの初期化に失敗しました: ' + error.message);
+            this.hideLoading();
         }
     }
     
@@ -219,11 +223,13 @@ class UltravioletProxy {
                 console.log('Service Worker registered:', registration);
                 return registration;
             } catch (error) {
-                console.error('Service Worker registration failed:', error);
-                throw error;
+                console.warn('Service Worker registration failed:', error);
+                // Service Workerの登録に失敗してもアプリは動作する
+                return null;
             }
         } else {
-            throw new Error('Service Worker not supported');
+            console.warn('Service Worker not supported');
+            return null;
         }
     }
     
@@ -252,12 +258,16 @@ class UltravioletProxy {
             // URL検証
             const url = this.validateAndFormatUrl(inputUrl);
             
-            // セキュリティチェック
+            // セキュリティチェック（APIが利用可能な場合のみ）
             if (this.settings.security) {
-                const securityCheck = await this.checkUrlSecurity(url);
-                if (!securityCheck.safe) {
-                    const proceed = await this.showSecurityWarning(securityCheck.reason, url);
-                    if (!proceed) return;
+                try {
+                    const securityCheck = await this.checkUrlSecurity(url);
+                    if (!securityCheck.safe) {
+                        const proceed = await this.showSecurityWarning(securityCheck.reason, url);
+                        if (!proceed) return;
+                    }
+                } catch (error) {
+                    console.warn('セキュリティチェックをスキップしました:', error.message);
                 }
             }
             
@@ -303,6 +313,11 @@ class UltravioletProxy {
     async checkUrlSecurity(url) {
         try {
             const response = await fetch(`/api/test?url=${encodeURIComponent(url)}`);
+            
+            if (!response.ok) {
+                throw new Error('Security check failed');
+            }
+            
             const result = await response.json();
             
             return {
@@ -359,13 +374,13 @@ class UltravioletProxy {
     }
     
     encodeUrl(url) {
-        // XOR エンコーディング (シンプル版)
-        const encoded = btoa(url).replace(/=/g, '');
-        return encoded;
+        // Base64 エンコーディング
+        return btoa(url).replace(/=/g, '');
     }
     
     decodeUrl(encoded) {
         try {
+            // Base64 デコーディング
             return atob(encoded);
         } catch (error) {
             throw new Error('URLのデコードに失敗しました');
@@ -423,14 +438,13 @@ class UltravioletProxy {
     
     applyTheme() {
         const theme = this.settings.theme;
-        const root = document.documentElement;
         
         // 既存のテーマクラスを削除
         document.body.classList.remove('theme-light', 'theme-dark', 'theme-blue');
         
         if (theme === 'auto') {
             // システムのダークモード設定を確認
-            const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+            const prefersDark = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches;
             document.body.classList.add(prefersDark ? 'theme-dark' : 'theme-light');
         } else {
             document.body.classList.add(`theme-${theme}`);
@@ -495,16 +509,10 @@ class UltravioletProxy {
     updateSpeedIndicator() {
         const speedElement = document.getElementById('speedIndicator');
         if (speedElement) {
-            // 簡易的な速度計算 (実際の実装では詳細な測定が必要)
-            const speed = this.calculateSpeed();
+            // 簡易的な速度計算
+            const speed = this.isReady ? '準備完了' : '接続中';
             speedElement.textContent = speed;
         }
-    }
-    
-    calculateSpeed() {
-        // プレースホルダー実装
-        const speeds = ['高速', '普通', '低速'];
-        return speeds[Math.floor(Math.random() * speeds.length)];
     }
     
     handleKeyboardShortcuts(e) {
@@ -549,29 +557,8 @@ class UltravioletProxy {
         this.updateStatus();
         this.updateUserAgentStatus();
         
-        // ツールチップを初期化
-        this.initializeTooltips();
-        
         // ダークモード監視
         this.setupDarkModeListener();
-    }
-    
-    initializeTooltips() {
-        // 簡易的なツールチップ実装
-        const tooltipElements = document.querySelectorAll('[title]');
-        tooltipElements.forEach(element => {
-            element.addEventListener('mouseenter', this.showTooltip.bind(this));
-            element.addEventListener('mouseleave', this.hideTooltip.bind(this));
-        });
-    }
-    
-    showTooltip(e) {
-        // ツールチップ表示のプレースホルダー
-        console.log('Tooltip:', e.target.getAttribute('title'));
-    }
-    
-    hideTooltip(e) {
-        // ツールチップ非表示のプレースホルダー
     }
     
     setupDarkModeListener() {
@@ -586,40 +573,94 @@ class UltravioletProxy {
     }
     
     showError(message) {
-        // 簡易的なエラー表示
         console.error('Error:', message);
-        alert(message); // 実際の実装では専用のエラーモーダルを使用
+        // 簡易的なエラー表示（実際の実装では専用のエラーモーダルを使用）
+        const errorDiv = document.createElement('div');
+        errorDiv.style.cssText = `
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            background: #f44336;
+            color: white;
+            padding: 16px;
+            border-radius: 8px;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+            z-index: 10000;
+            max-width: 400px;
+        `;
+        errorDiv.textContent = message;
+        document.body.appendChild(errorDiv);
+        
+        setTimeout(() => {
+            if (errorDiv.parentNode) {
+                errorDiv.parentNode.removeChild(errorDiv);
+            }
+        }, 5000);
     }
     
     showSuccess(message) {
-        // 簡易的な成功メッセージ表示
         console.log('Success:', message);
+        // 簡易的な成功メッセージ表示
+        const successDiv = document.createElement('div');
+        successDiv.style.cssText = `
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            background: #4caf50;
+            color: white;
+            padding: 16px;
+            border-radius: 8px;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+            z-index: 10000;
+            max-width: 400px;
+        `;
+        successDiv.textContent = message;
+        document.body.appendChild(successDiv);
+        
+        setTimeout(() => {
+            if (successDiv.parentNode) {
+                successDiv.parentNode.removeChild(successDiv);
+            }
+        }, 3000);
     }
     
-    // API メソッド
+    // API メソッド（エラーハンドリング強化）
     async getStats() {
         try {
             const response = await fetch('/api/stats');
+            if (!response.ok) {
+                throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+            }
             return await response.json();
         } catch (error) {
             console.error('統計の取得に失敗しました:', error);
-            return null;
+            return {
+                server: { requests: 0, blocked: 0, uptime: 0 },
+                features: { adblock: false, security: false, userAgent: false }
+            };
         }
     }
     
     async getConfig() {
         try {
             const response = await fetch('/api/config');
+            if (!response.ok) {
+                throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+            }
             return await response.json();
         } catch (error) {
             console.error('設定の取得に失敗しました:', error);
-            return null;
+            return {
+                features: { adblock: false, security: false, userAgent: false },
+                version: '1.0.0'
+            };
         }
     }
 }
 
 // アプリケーションを初期化
 document.addEventListener('DOMContentLoaded', () => {
+    console.log('DOM loaded, initializing Ultraviolet Proxy...');
     window.ultravioletProxy = new UltravioletProxy();
 });
 
@@ -627,5 +668,16 @@ document.addEventListener('DOMContentLoaded', () => {
 window.navigateToUrl = function(url) {
     if (window.ultravioletProxy) {
         window.ultravioletProxy.navigateToUrl(url);
+    } else {
+        console.warn('UltravioletProxy not ready yet');
     }
 };
+
+// エラーハンドリング
+window.addEventListener('error', (event) => {
+    console.error('Global error:', event.error);
+});
+
+window.addEventListener('unhandledrejection', (event) => {
+    console.error('Unhandled promise rejection:', event.reason);
+});
