@@ -12,13 +12,13 @@ const STATIC_CACHE_RESOURCES = [
     '/',
     '/index.html',
     '/assets/css/style.css',
-    '/assets/css/themes.css',
-    '/assets/css/responsive.css',
+    // '/assets/css/themes.css', // ファイルが存在しないためコメントアウト
+    // '/assets/css/responsive.css', // ファイルが存在しないためコメントアウト
     '/assets/js/app.js',
-    '/assets/js/settings.js',
-    '/assets/js/history.js',
-    '/assets/js/bookmarks.js',
-    '/manifest.json'
+    // '/assets/js/settings.js', // ファイルが存在しないためコメントアウト
+    // '/assets/js/history.js', // ファイルが存在しないためコメントアウト
+    // '/assets/js/bookmarks.js', // ファイルが存在しないためコメントアウト
+    // '/manifest.json' // ファイルが存在しないためコメントアウト
 ];
 
 // Ultraviolet設定
@@ -129,42 +129,63 @@ self.addEventListener('fetch', (event) => {
 async function handleProxyRequest(request) {
     try {
         proxyStats.requests++;
+        log('info', 'handleProxyRequest started', { url: request.url, method: request.method });
         
         const url = new URL(request.url);
         const encodedUrl = url.pathname.replace(UV_PREFIX, '');
+        log('info', 'Extracted encoded URL', { encodedUrl });
         
         if (!encodedUrl) {
+            log('warn', 'No encoded URL provided');
             return new Response('URLが指定されていません', { status: 400 });
         }
         
         // URLをデコード
-        const targetUrl = UV_CONFIG.decodeUrl(encodedUrl);
-        log('info', 'Proxying request', { targetUrl, method: request.method });
+        let targetUrl;
+        try {
+            targetUrl = UV_CONFIG.decodeUrl(encodedUrl);
+            log('info', 'Decoded target URL', { targetUrl, encodedUrl });
+        } catch (decodeError) {
+            log('error', 'URL decode failed', { encodedUrl, error: decodeError.message });
+            return new Response('URLのデコードに失敗しました', { status: 400 });
+        }
+        
+        log('info', 'Starting proxy request processing', { targetUrl, method: request.method });
         
         // セキュリティチェック
+        log('info', 'Performing security check');
         const securityCheck = await performSecurityCheck(targetUrl, request);
         if (!securityCheck.allowed) {
             log('warn', 'Request blocked by security check', securityCheck);
             proxyStats.blocked++;
             return createBlockedResponse(securityCheck.reason);
         }
+        log('info', 'Security check passed');
         
         // 広告ブロックチェック
+        log('info', 'Performing adblock check');
         const adblockCheck = await performAdblockCheck(targetUrl, request);
         if (!adblockCheck.allowed) {
             log('info', 'Request blocked by adblock', adblockCheck);
             proxyStats.blocked++;
             return createBlockedResponse('広告ブロック');
         }
+        log('info', 'Adblock check passed');
         
         // プロキシリクエストの作成と送信
+        log('info', 'About to execute proxy request');
         const proxyResponse = await executeProxyRequest(targetUrl, request);
+        log('info', 'Proxy request completed', { status: proxyResponse.status });
         
         // レスポンスの後処理
-        return processProxyResponse(proxyResponse, targetUrl);
+        log('info', 'Starting response processing');
+        const finalResponse = await processProxyResponse(proxyResponse, targetUrl);
+        log('info', 'Response processing completed', { status: finalResponse.status });
+        
+        return finalResponse;
         
     } catch (error) {
-        log('error', 'Proxy request failed', { error: error.message, url: request.url });
+        log('error', 'Proxy request failed', { error: error.message, stack: error.stack, url: request.url });
         proxyStats.errors++;
         return createErrorResponse(error.message);
     }
@@ -266,84 +287,149 @@ async function performAdblockCheck(targetUrl, request) {
 
 // プロキシリクエストの実行
 async function executeProxyRequest(targetUrl, originalRequest) {
-    // リクエストヘッダーを準備
-    const headers = new Headers();
-    
-    // 必要なヘッダーをコピー
-    const allowedHeaders = [
-        'accept',
-        'accept-language',
-        'accept-encoding',
-        'cache-control',
-        'content-type',
-        'user-agent',
-        'referer'
-    ];
-    
-    for (const header of allowedHeaders) {
-        const value = originalRequest.headers.get(header);
-        if (value) {
-            headers.set(header, value);
+    const bareRequestHeaders = new Headers(); // Bareサーバーへのリクエストヘッダー
+    const targetRequestHeaders = {}; // ターゲットサーバーへのリクエストヘッダー
+
+    // ターゲットサーバーへ渡すヘッダーを最小限に絞り込む
+    // const targetRequestHeaders = {}; // この行を削除
+    if (originalRequest.headers.has('user-agent')) {
+        targetRequestHeaders['user-agent'] = originalRequest.headers.get('user-agent');
+    }
+    if (originalRequest.headers.has('accept')) {
+        targetRequestHeaders['accept'] = originalRequest.headers.get('accept');
+    }
+    if (originalRequest.headers.has('accept-language')) {
+        targetRequestHeaders['accept-language'] = originalRequest.headers.get('accept-language');
+    }
+    if (originalRequest.headers.has('accept-encoding')) {
+        // Accept-Encoding はBareサーバーが処理することが多いので、一旦コメントアウト
+        // targetRequestHeaders['accept-encoding'] = originalRequest.headers.get('accept-encoding');
+    }
+    if ((originalRequest.method === 'POST' || originalRequest.method === 'PUT' || originalRequest.method === 'PATCH') && originalRequest.headers.has('content-type')) {
+        const originalContentType = originalRequest.headers.get('content-type');
+        if (originalContentType) {
+            targetRequestHeaders['content-type'] = originalContentType;
         }
     }
-    
-    // プロキシ特有のヘッダーを追加
-    headers.set('X-Forwarded-For', 'proxy');
-    headers.set('X-Requested-With', 'UltravioletProxy');
-    
-    // リクエストオプション
+    // Refererは状況によって必要になることがあるが、一旦除外してシンプルにする
+    // if (originalRequest.headers.has('referer')) {
+    //     targetRequestHeaders['referer'] = originalRequest.headers.get('referer');
+    // }
+
+
+    bareRequestHeaders.set('X-Bare-URL', targetUrl);
+    bareRequestHeaders.set('X-Bare-Headers', JSON.stringify(targetRequestHeaders));
+
     const requestOptions = {
-        method: originalRequest.method,
-        headers: headers,
+        method: 'POST', // Bareサーバーへのリクエストは通常POST
+        headers: bareRequestHeaders,
         credentials: 'omit',
-        redirect: 'follow'
+        redirect: 'manual' // Bareサーバーがリダイレクトを処理
     };
-    
-    // ボディがある場合は追加
+
     if (originalRequest.method !== 'GET' && originalRequest.method !== 'HEAD') {
         try {
-            requestOptions.body = await originalRequest.clone().arrayBuffer();
+            const body = await originalRequest.clone().arrayBuffer();
+            if (body && body.byteLength > 0) {
+                requestOptions.body = body;
+            }
         } catch (error) {
-            log('warn', 'Failed to clone request body', error);
+            log('warn', 'Failed to clone request body for Bare server', error);
         }
     }
+
+    // BareサーバーのAPIエンドポイント (例: /bare/)
+    const bareServerApiEndpoint = UV_CONFIG.bare.endsWith('/') ? UV_CONFIG.bare : UV_CONFIG.bare + '/';
     
-    // リクエストを送信
-    const response = await fetch(targetUrl, requestOptions);
+    // 完全なURLを構築
+    const fullBareUrl = new URL(bareServerApiEndpoint, self.location.origin).href;
+
+    const bareHeadersForLog = {};
+    for (const [key, value] of bareRequestHeaders.entries()) {
+        bareHeadersForLog[key] = value;
+    }
+    log('info', 'Executing Bare request', {
+        endpoint: bareServerApiEndpoint,
+        fullUrl: fullBareUrl,
+        method: requestOptions.method,
+        targetUrl: targetUrl,
+        bareRequestHeaders: JSON.stringify(bareHeadersForLog),
+        targetRequestHeadersForBare: JSON.stringify(targetRequestHeaders)
+    });
     
-    if (!response.ok) {
-        log('warn', 'Proxy request returned error status', {
-            status: response.status,
-            statusText: response.statusText,
-            url: targetUrl
+    let bareResponse;
+    try {
+        log('info', 'About to fetch from Bare server', { url: fullBareUrl });
+        bareResponse = await fetch(fullBareUrl, requestOptions);
+        log('info', 'Fetch completed', { status: bareResponse.status, ok: bareResponse.ok });
+    } catch (fetchError) {
+        log('error', 'Fetch to Bare server failed', {
+            url: fullBareUrl,
+            error: fetchError.message,
+            name: fetchError.name,
+            stack: fetchError.stack
+        });
+        throw fetchError;
+    }
+
+    if (!bareResponse.ok) {
+        let responseBodyText = 'Bare server error'; // デフォルトのエラーメッセージ
+        try {
+            // response.text() は一度しか呼べないため、エラー時のみ読み取る
+            responseBodyText = await bareResponse.text();
+        } catch (e) {
+            log('warn', 'Could not read error response body from Bare server', e);
+        }
+        log('warn', 'Bare server request returned error status', {
+            status: bareResponse.status,
+            statusText: bareResponse.statusText,
+            url: bareServerApiEndpoint,
+            targetUrl: targetUrl,
+            responseBody: responseBodyText
+        });
+        // エラーレスポンスをクライアントに返すために新しいResponseオブジェクトを作成
+        const errorStatus = bareResponse.status || 500; // ステータスコードが0の場合は500に変更
+        return new Response(responseBodyText || `Bare server error: ${errorStatus}`, {
+            status: errorStatus,
+            statusText: bareResponse.statusText || 'Server Error',
+            headers: {
+                'Content-Type': 'text/plain',
+                'X-Proxy-Error': 'Bare server error'
+            }
         });
     }
     
-    return response;
+    return bareResponse;
 }
 
 // プロキシレスポンスの後処理
-async function processProxyResponse(response, targetUrl) {
+async function processProxyResponse(bareResponse, targetUrl) {
+    // Bareサーバーからのレスポンスがエラーの場合、そのままクライアントに返す
+    // この時点でbareResponseはエラー処理済みで、新しいResponseオブジェクトになっている可能性がある
+    if (!bareResponse.ok) {
+        return bareResponse;
+    }
+
     const url = new URL(targetUrl);
-    const contentType = response.headers.get('content-type') || '';
+    const contentType = bareResponse.headers.get('content-type') || '';
     
     // HTMLの場合はURLを書き換え
     if (contentType.includes('text/html')) {
-        return await processHTMLResponse(response, url);
+        return await processHTMLResponse(bareResponse, url);
     }
     
     // CSSの場合もURLを書き換え
     if (contentType.includes('text/css')) {
-        return await processCSSResponse(response, url);
+        return await processCSSResponse(bareResponse, url);
     }
     
     // JavaScriptの場合は制限チェック
     if (contentType.includes('javascript') || contentType.includes('ecmascript')) {
-        return await processJSResponse(response, url);
+        return await processJSResponse(bareResponse, url);
     }
     
     // その他のリソースはそのまま返す
-    return createProxyResponse(response);
+    return createProxyResponse(bareResponse);
 }
 
 // HTMLレスポンスの処理

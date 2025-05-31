@@ -32,8 +32,57 @@ const PORT = process.env.PORT || 3000;
 // Trust proxy 設定（レート制限の前に設定）
 app.set('trust proxy', 1);
 
-// Bare サーバー作成
-const bareServer = createBareServer('/bare/');
+// Bare サーバー作成（デフォルト設定で試す）
+const bareServer = createBareServer('/bare/', {
+  logErrors: true,
+  localAddress: undefined,
+  maintainer: {
+    email: 'admin@localhost',
+    website: 'http://localhost:' + (process.env.PORT || 3000)
+  }
+});
+
+// テスト用エンドポイント
+app.get('/bare/test', (req, res) => {
+  logger.info('Received test request to /bare/test');
+  res.json({
+    message: 'Bare server test endpoint working',
+    timestamp: new Date().toISOString(),
+    headers: req.headers
+  });
+});
+
+// デバッグ用：全てのリクエストをログ出力
+app.use((req, res, next) => {
+  if (req.url.startsWith('/bare/')) {
+    logger.info('Any request to /bare/', {
+      method: req.method,
+      url: req.url,
+      path: req.path,
+      headers: {
+        'x-bare-url': req.headers['x-bare-url'],
+        'x-bare-headers': req.headers['x-bare-headers'],
+        'content-type': req.headers['content-type'],
+        'user-agent': req.headers['user-agent']
+      }
+    });
+  }
+  next();
+});
+
+// Bare サーバーのHTTPリクエスト処理
+app.use((req, res, next) => {
+  if (bareServer.shouldRoute(req)) {
+    logger.info('Bare server WILL route this request', {
+      method: req.method,
+      url: req.url,
+      path: req.path
+    });
+    bareServer.routeRequest(req, res);
+  } else {
+    next();
+  }
+});
 
 // セキュリティミドルウェア
 app.use(helmet({
@@ -236,14 +285,7 @@ server.on('upgrade', (req, socket, head) => {
   }
 });
 
-// Bare サーバーのHTTPリクエスト処理
-app.use((req, res, next) => {
-  if (bareServer.shouldRoute(req)) {
-    bareServer.routeRequest(req, res);
-  } else {
-    next();
-  }
-});
+// Bare サーバーのHTTPリクエスト処理は上部に移動済み
 
 // 優雅なシャットダウン
 process.on('SIGTERM', () => {
