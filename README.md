@@ -1,421 +1,141 @@
-# Ultraviolet Proxy - 高機能Webプロキシサーバー
+<div align="center">
+    <img src="https://raw.githubusercontent.com/UseInterstellar/Interstellar/main/.github/branding/in.png">
+    <p>Serving over 8+ million users since 2023.<p>
+    <p>Interstellar is a web proxy with a Clean and Sleek UI and easy to use menus. Our goal is to provide the best user experience to everyone.</p>
+</div>
 
-UltravioletとBare-Clientを使用した、高機能なWebプロキシサーバーです。学校や職場のネットワーク制限を回避し、安全かつプライベートなウェブブラウジングを提供します。
+![inpreview](https://github.com/UseInterstellar/Interstellar/assets/89202835/2669efed-5186-4932-83c4-725acae60bd2)
 
-## 🚀 主な機能
+> [!IMPORTANT]
+> If you fork this project, consider giving it a star in the original repository!
 
-### ✨ 基本機能
-- **完全なウェブブラウジング**: JavaScript、CSS、画像の完全サポート
-- **高速プロキシエンジン**: Ultraviolet + Bare-Client による高性能通信
-- **レスポンシブデザイン**: デスクトップ・タブレット・モバイル対応
+**Join Our [Discord Community](https://discord.gg/interstellar) for support, more links, and an active community!**
 
-### 🛡️ セキュリティ機能
-- **セキュリティ保護**: 危険なサイトや悪意のあるコンテンツの自動ブロック
-- **プライベートネットワーク保護**: ローカルネットワークへのアクセス制限
-- **安全なファイルダウンロード**: 危険なファイル拡張子の検出とブロック
+## Features
 
-### 🚫 広告ブロック機能
-- **高度な広告ブロック**: EasyListベースのフィルタリング
-- **トラッキング防止**: 各種アナリティクス・トラッキングピクセルをブロック
-- **カスタムフィルター**: 独自のブロックルール追加可能
+- About:Blank Cloaking
+- Tab Cloaking
+- Wide collection of apps & games
+- Clean, Easy to use UI
+- Inspect Element
+- Various Themes
+- Password Protection (Optional)
+- Built-in Tab System
+- Now.gg Support
+- Fast Speeds
+- Geforce NOW Support
 
-### 🎭 プライバシー機能
-- **ユーザーエージェント変更**: Chrome、Firefox、Safari、モバイルブラウザに偽装
-- **リファラー制御**: 適切なリファラーポリシーの設定
-- **Cookie管理**: セキュアなCookie処理
+## Deployment
 
-### ⚙️ 高度な機能
-- **JavaScript制御**: 有効・制限付き・無効の3段階制御
-- **カスタムCSS**: サイト表示のカスタマイズ
-- **履歴・お気に入り**: ローカルストレージベースの管理
-- **テーマ切り替え**: ライト・ダーク・ブルーテーマ
+> [!IMPORTANT]
+> You **cannot** deploy to static web hosts, including Netlify, Cloudflare Pages, and GitHub Pages.
 
-## 📦 インストール
+### Password Protection
 
-### 前提条件
-- Node.js 16.x 以上
-- npm または yarn
-- VPS または専用サーバー
+1. Go to the `config.js` file and set `challenge` to **true**. Then, set the environment variable as follows:
+2. For PNPM: Run either `config=true pnpm start` or `$env:config=true; pnpm start`, depending on your server.
+3. For Bun: Run either `config=true bun start` or `$env:config=true; bun start` if you prefer Bun.
+4. For NPM: Run either `config=true npm start` or `$env:config=true; npm start` if you prefer NPM.
 
-### セットアップ手順
 
-1. **リポジトリのクローン**
-```bash
-git clone https://github.com/yourusername/ultraviolet-proxy.git
-cd ultraviolet-proxy
-```
+### Server Deployment
 
-2. **依存関係のインストール**
-```bash
-npm install
-```
-
-3. **環境変数の設定**
-```bash
-cp .env.example .env
-nano .env
-```
-
-4. **アプリケーションの起動**
-```bash
-# 開発モード
-npm run dev
-
-# 本番モード
-npm start
-```
-
-## 🖥️ サーバー要件
-
-### 最小要件
-- **CPU**: 1 vCPU
-- **RAM**: 1GB
-- **ストレージ**: 5GB
-- **帯域幅**: 100Mbps
-
-### 推奨要件
-- **CPU**: 2+ vCPU
-- **RAM**: 2GB+
-- **ストレージ**: 10GB+
-- **帯域幅**: 1Gbps
-
-## ⚙️ 設定
-
-### 環境変数
+You must run these commands on your server:
 
 ```bash
-# サーバー設定
-PORT=3000
-NODE_ENV=production
-
-# ログ設定
-LOG_LEVEL=info
-LOG_FILE=./logs/app.log
-
-# セキュリティ設定
-RATE_LIMIT_WINDOW=900000
-RATE_LIMIT_MAX=1000
-
-# プロキシ設定
-UV_PREFIX=/service/
-BARE_PREFIX=/bare/
+git clone https://github.com/UseInterstellar/Interstellar
+cd Interstellar
 ```
 
-### Nginx設定例
-
-```nginx
-server {
-    listen 80;
-    server_name your-domain.com;
-    
-    # HTTPS リダイレクト
-    return 301 https://$server_name$request_uri;
-}
-
-server {
-    listen 443 ssl http2;
-    server_name your-domain.com;
-    
-    # SSL証明書設定
-    ssl_certificate /path/to/cert.pem;
-    ssl_certificate_key /path/to/key.pem;
-    
-    # SSL設定
-    ssl_protocols TLSv1.2 TLSv1.3;
-    ssl_ciphers HIGH:!aNULL:!MD5;
-    ssl_prefer_server_ciphers on;
-    
-    # セキュリティヘッダー
-    add_header X-Frame-Options "SAMEORIGIN" always;
-    add_header X-Content-Type-Options "nosniff" always;
-    add_header X-XSS-Protection "1; mode=block" always;
-    
-    # プロキシ設定
-    location / {
-        proxy_pass http://localhost:3000;
-        proxy_http_version 1.1;
-        proxy_set_header Upgrade $http_upgrade;
-        proxy_set_header Connection 'upgrade';
-        proxy_set_header Host $host;
-        proxy_set_header X-Real-IP $remote_addr;
-        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
-        proxy_set_header X-Forwarded-Proto $scheme;
-        proxy_cache_bypass $http_upgrade;
-    }
-    
-    # 静的ファイルのキャッシュ
-    location ~* \.(css|js|png|jpg|jpeg|gif|ico|svg)$ {
-        proxy_pass http://localhost:3000;
-        expires 1y;
-        add_header Cache-Control "public, immutable";
-    }
-}
-```
-
-### PM2設定例
-
-```javascript
-// ecosystem.config.js
-module.exports = {
-  apps: [{
-    name: 'ultraviolet-proxy',
-    script: 'server.js',
-    instances: 'max',
-    exec_mode: 'cluster',
-    env: {
-      NODE_ENV: 'production',
-      PORT: 3000
-    },
-    error_file: './logs/pm2-error.log',
-    out_file: './logs/pm2-out.log',
-    log_file: './logs/pm2-combined.log',
-    time: true
-  }]
-};
-```
-
-## 🎨 カスタマイズ
-
-### テーマのカスタマイズ
-
-`public/assets/css/themes.css` でテーマをカスタマイズできます：
-
-```css
-/* カスタムテーマ例 */
-.theme-custom {
-    --primary-color: #e91e63;
-    --primary-dark: #c2185b;
-    --bg-primary: #fce4ec;
-}
-```
-
-### 広告ブロックルールの追加
-
-`src/middleware/adblock.js` でカスタムルールを追加：
-
-```javascript
-// カスタムドメインの追加
-adblockMiddleware.addDomain('example-ads.com');
-
-// カスタムパターンの追加
-adblockMiddleware.addPattern(/\/custom-ad-pattern\//i);
-```
-
-### ユーザーエージェントの追加
-
-`src/middleware/useragent.js` でカスタムUAを追加：
-
-```javascript
-// カスタムユーザーエージェントの追加
-useragentMiddleware.addUserAgent('custom', 'my-browser', {
-    name: 'My Custom Browser',
-    ua: 'Mozilla/5.0 (Custom) Browser/1.0',
-    platform: 'Custom',
-    vendor: 'Custom Inc.',
-    features: ['custom-feature']
-});
-```
-
-## 📊 監視とログ
-
-### ログファイル
-- `logs/error.log` - エラーログ
-- `logs/combined.log` - 全てのログ
-- `logs/access.log` - アクセスログ
-
-### 統計API
-- `GET /api/stats` - 統計情報の取得
-- `GET /api/status` - サーバー状態の確認
-- `GET /api/health` - ヘルスチェック
-
-### 監視設定例（Grafana + Prometheus）
-
-```yaml
-# prometheus.yml
-global:
-  scrape_interval: 15s
-
-scrape_configs:
-  - job_name: 'ultraviolet-proxy'
-    static_configs:
-      - targets: ['localhost:3000']
-    metrics_path: '/api/metrics'
-    scrape_interval: 30s
-```
-
-## 🔧 トラブルシューティング
-
-### よくある問題
-
-#### 1. プロキシが動作しない
-```bash
-# ログを確認
-tail -f logs/combined.log
-
-# ポートの確認
-netstat -tulpn | grep 3000
-
-# プロセスの確認
-ps aux | grep node
-```
-
-#### 2. 広告ブロックが効かない
-- ブラウザのキャッシュをクリア
-- 設定で広告ブロックが有効になっているか確認
-- カスタムルールの構文を確認
-
-#### 3. セキュリティ警告が多発する
-- セキュリティレベルを調整
-- ホワイトリストにドメインを追加
-- ログでブロック理由を確認
-
-#### 4. パフォーマンスが低下
-```bash
-# メモリ使用量確認
-free -h
-
-# CPU使用率確認
-top -p $(pgrep -f "node.*server.js")
-
-# ディスク容量確認
-df -h
-```
-
-## 🚀 本番デプロイ
-
-### Docker を使用したデプロイ
-
-```dockerfile
-# Dockerfile
-FROM node:16-alpine
-
-WORKDIR /app
-COPY package*.json ./
-RUN npm ci --only=production
-
-COPY . .
-EXPOSE 3000
-
-USER node
-CMD ["npm", "start"]
-```
-
-```yaml
-# docker-compose.yml
-version: '3.8'
-services:
-  ultraviolet-proxy:
-    build: .
-    ports:
-      - "3000:3000"
-    environment:
-      - NODE_ENV=production
-    volumes:
-      - ./logs:/app/logs
-    restart: unless-stopped
-    
-  nginx:
-    image: nginx:alpine
-    ports:
-      - "80:80"
-      - "443:443"
-    volumes:
-      - ./nginx.conf:/etc/nginx/nginx.conf
-      - ./ssl:/etc/ssl
-    depends_on:
-      - ultraviolet-proxy
-    restart: unless-stopped
-```
-
-### セキュリティ強化
+#### Ad-Free Deployment
 
 ```bash
-# ファイアウォール設定
-ufw allow ssh
-ufw allow 80
-ufw allow 443
-ufw enable
-
-# 自動更新設定
-echo 'unattended-upgrades unattended-upgrades/enable_auto_updates boolean true' | debconf-set-selections
-apt-get install unattended-upgrades
-
-# ログローテーション設定
-cat > /etc/logrotate.d/ultraviolet-proxy << 'EOF'
-/path/to/ultraviolet-proxy/logs/*.log {
-    daily
-    missingok
-    rotate 52
-    compress
-    delaycompress
-    notifempty
-    create 644 node node
-    postrotate
-        systemctl reload ultraviolet-proxy
-    endscript
-}
-EOF
+git clone --branch Ad-Free https://github.com/UseInterstellar/Interstellar
+cd Interstellar
 ```
 
-## 📈 パフォーマンス最適化
+Next depending on your package manager, run one of the following commands:
 
-### Node.js 最適化
+#### Bun
+
+If you are using Bun, run the following commands:
+
 ```bash
-# メモリ制限の設定
-export NODE_OPTIONS="--max-old-space-size=2048"
-
-# クラスター化
-npm install pm2 -g
-pm2 start ecosystem.config.js
+bun i
+bun start
 ```
 
-### CDN設定
-```javascript
-// 静的ファイルのCDN化
-const CDN_URL = process.env.CDN_URL || '';
+#### pnpm
 
-app.use('/assets', express.static('public/assets', {
-    maxAge: '1y',
-    setHeaders: (res, path) => {
-        if (CDN_URL) {
-            res.setHeader('X-CDN-URL', CDN_URL);
-        }
-    }
-}));
+If you are using pnpm, run the following commands:
+
+```bash
+pnpm i
+pnpm start
 ```
 
-## 🤝 コントリビューション
+#### npm
 
-コントリビューションを歓迎します！
+If you are using npm, run the following commands:
 
-1. フォークしてください
-2. フィーチャーブランチを作成してください (`git checkout -b feature/AmazingFeature`)
-3. 変更をコミットしてください (`git commit -m 'Add some AmazingFeature'`)
-4. ブランチにプッシュしてください (`git push origin feature/AmazingFeature`)
-5. プルリクエストを作成してください
+```bash
+npm i
+npm run start
+```
 
-## 📄 ライセンス
+### Updating
 
-このプロジェクトはMITライセンスの下で公開されています。詳細は `LICENSE` ファイルを参照してください。
+```bash
+cd Interstellar
+git pull --force --allow-unrelated-histories # This may overwrite your local changes
+```
 
-## ⚠️ 免責事項
+<a target="_blank" href="https://heroku.com/deploy/?template=https://github.com/UseInterstellar/Interstellar"><img alt="Deploy to Heroku" src="https://binbashbanana.github.io/deploy-buttons/buttons/remade/heroku.svg"></a>
+<a target="_blank" href="https://app.koyeb.com/deploy?type=git&repository=github.com/UseInterstellar/Interstellar"><img alt="Deploy to Koyeb" src="https://binbashbanana.github.io/deploy-buttons/buttons/remade/koyeb.svg"></a>
 
-このソフトウェアは教育目的で提供されています。利用者は自己責任でご使用ください。開発者は、このソフトウェアの使用によって生じたいかなる損害についても責任を負いません。
+### Deployment Alternatives
 
-## 🙏 謝辞
+For more deployment options, join our [Discord Server](https://discord.gg/interstellar) for various ways to deploy Interstellar.
+This includes methods of deploying to Render/OnRender.
 
-- [Ultraviolet](https://github.com/titaniumnetwork-dev/Ultraviolet) - 高性能プロキシエンジン
-- [Bare-Client](https://github.com/tomphttp/bare-client) - 効率的なHTTPトランスポート
-- その他のオープンソースプロジェクト
+#### What happened to Replit Deployment?
 
-## 📞 サポート
+As of January 1st, 2024, Replit is [no longer free](https://blog.replit.com/hosting-changes). Try GitHub Codespaces instead.
 
-問題が発生した場合は、以下の方法でサポートを受けられます：
+### GitHub Codespaces
 
-- [GitHub Issues](https://github.com/yourusername/ultraviolet-proxy/issues)
-- [Discord サーバー](https://discord.gg/your-server)
-- [ドキュメント](https://docs.your-domain.com)
+> [!NOTE]
+> If you're setting the port below 1023, then you must run `sudo PORT=1023`
 
----
+1. Create a GitHub account if you haven't already.
+2. Click "Code" (green button) and then "Create Codespace on main."
+3. In the terminal at the bottom, paste `pnpm i && pnpm start`.
+4. Respond to the application popup by clicking "Make public."
+> [!IMPORTANT]
+> Make sure you click the "Make public." button, or the proxy won't function properly.<br>
+> If you get a Range Error, go back and make sure you clicked Make public!
+5. Access the deployed website from the ports tab.
+6. For subsequent uses in the same codespace, just run `pnpm start`
 
-**Ultraviolet Proxy** - 自由で安全なインターネットアクセスを提供します 🌐
+### Solution for if there is no popup.
+
+1. Run `pnpm i`, and before `pnpm start`, prepend `PORT=8080`, replacing 8080 with another port. For example, `PORT=6969 pnpm start`.
+2. If this does not work then you can prepend `$env:PORT=8080;`, replacing 8080 with another port. For example, `$env:PORT=6969; pnpm start`
+3. Go to the ports tab, Click Forward A Port, And type the port number.
+4. Right-click Visibility and set Port Visibility to Public.
+
+> [!NOTE]
+> We are committed to making Interstellar easy and personalized however, as of now we need your support in making it ad-free. Consider keeping ads so Interstellar can run freely or contribute by being a supporter.
+
+## Report Issues
+
+If you encounter problems, open an issue on GitHub, and we'll address it promptly.
+
+> [!TIP]
+> If you're having trouble, don't hesitate to reach out to us on [Discord](https://discord.gg/interstellar) for personalized support.
+
+# Credits
+
+A huge thanks goes out to all of the people who have contributed to Interstellar.
+
+[![Contributors](https://contrib.rocks/image?repo=UseInterstellar/Interstellar)](https://github.com/UseInterstellar/Interstellar/graphs/contributors)

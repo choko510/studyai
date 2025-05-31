@@ -1,0 +1,44 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8" />
+  <meta name="referrer" content="no-referrer" />
+  <meta http-equiv="X-Frame-Options" content="SAMEORIGIN" />
+  <meta http-equiv="X-Content-Type-Options" content="nosniff" />
+  <link rel="shortcut icon" id="tab-favicon" href="favicon.png" />
+  <title id="t">Games</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <link rel="stylesheet" href="/assets/css/global.css?v=6" />
+  <link rel="stylesheet" href="/assets/css/container.css?v=2" />
+  <script src="/assets/js/005.js?v=000"></script>
+</head>
+
+<body>
+  <nav style="padding: 20px; text-align: center;">
+    <a href="/" style="margin: 0 15px; text-decoration: none; color: #fff;">Home</a>
+    <a href="/games.html" style="margin: 0 15px; text-decoration: none; color: #fff;">Games</a>
+    <a href="/settings.html" style="margin: 0 15px; text-decoration: none; color: #fff;">Settings</a>
+    <a href="/tabs.html" style="margin: 0 15px; text-decoration: none; color: #fff;">Proxy</a>
+  </nav>
+  
+  <div class="input-c">
+    <input type="text" id="search" onkeyup="bar()" placeholder="Search" />
+    <select id="category" name="category" onchange="category()">
+      <option value="all">All</option>
+      <option value="android">Android Emulator</option>
+      <option value="2P">Multiplayer</option>
+      <option value="sports">Sports</option>
+      <option value="flash">Flash</option>
+      <option value="emu">Emulator</option>
+      <option value="local">Local</option>
+    </select>
+  </div>
+  <div class="pinned"></div>
+  <div class="apps"></div>
+  <script src="/assets/js/002.js?v=001"></script>
+  <script src="./assets/mathematics/bundle.js?v=2025-04-15"></script>
+  <script src="./assets/mathematics/config.js?v=2025-04-15"></script>
+</body>
+
+</html>

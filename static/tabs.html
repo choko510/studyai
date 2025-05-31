@@ -1,0 +1,120 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8" />
+  <meta name="referrer" content="no-referrer" />
+  <meta http-equiv="X-Frame-Options" content="SAMEORIGIN" />
+  <meta http-equiv="X-Content-Type-Options" content="nosniff" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <link rel="shortcut icon" id="tab-favicon" href="favicon.png" />
+  <title id="t">Proxy</title>
+  <link rel="stylesheet" href="/assets/css/global.css?v=6" />
+</head>
+
+<body>
+  <nav style="padding: 20px; text-align: center;">
+    <a href="/" style="margin: 0 15px; text-decoration: none; color: #fff;">Home</a>
+    <a href="/games.html" style="margin: 0 15px; text-decoration: none; color: #fff;">Games</a>
+    <a href="/settings.html" style="margin: 0 15px; text-decoration: none; color: #fff;">Settings</a>
+    <a href="/tabs.html" style="margin: 0 15px; text-decoration: none; color: #fff;">Proxy</a>
+  </nav>
+  
+  <div class="nav-bar">
+    <div class="nav-container">
+      <div class="nav-left">
+        <button title="Home Page" id="home-page" class="nav-button" onclick="window.location.href='/'">
+          <i class="fa-solid fa-house"></i>
+        </button>
+        <button title="Back Arrow" class="nav-button" onclick="goBack()">
+          <i class="fa-solid fa-arrow-left"></i>
+        </button>
+        <button title="Forward Arrow" class="nav-button" onclick="goForward()">
+          <i class="fa-solid fa-arrow-right"></i>
+        </button>
+        <button title="Reload" onclick="reload()" class="nav-button">
+          <i class="fa-solid fa-rotate-right"></i>
+        </button>
+        <form id="fv" class="navpost" method="POST">
+          <input id="iv" class="bar" placeholder="Search or enter a URL" type="text" />
+        </form>
+      </div>
+      <div class="nav-right">
+        <button title="Fullscreen" id="fullscreen-button" class="nav-button nav-btn-right" onclick="FS()">
+          <i class="fa-solid fa-expand"></i>
+        </button>
+      </div>
+    </div>
+  </div>
+  <div class="frame-container" id="frame-container">
+    <iframe id="main-frame" src="/" style="width: 100%; height: calc(100vh - 60px); border: none;"></iframe>
+  </div>
+  <script src="./assets/mathematics/bundle.js?v=2025-04-15"></script>
+  <script src="./assets/mathematics/config.js?v=2025-04-15"></script>
+  <script src="./assets/js/js-injection.js"></script>
+  <script>
+    // Simple proxy functionality without tabs
+    const form = document.getElementById("fv");
+    const input = document.getElementById("iv");
+    const iframe = document.getElementById("main-frame");
+
+    if (form && input) {
+      form.addEventListener("submit", async event => {
+        event.preventDefault();
+        const url = input.value.trim();
+        const engine = localStorage.getItem("engine") || "https://www.google.com/search?q=";
+        
+        let finalUrl = url;
+        if (!isUrl(url)) {
+          finalUrl = engine + url;
+        } else if (!(url.startsWith("https://") || url.startsWith("http://"))) {
+          finalUrl = `https://${url}`;
+        }
+
+        const dy = localStorage.getItem("dy");
+        if (dy === "true") {
+          iframe.src = `/a/q/${__uv$config.encodeUrl(finalUrl)}`;
+        } else {
+          iframe.src = `/a/${__uv$config.encodeUrl(finalUrl)}`;
+        }
+
+        // Start monitoring for JS injection
+        if (window.jsInjector) {
+          window.jsInjector.monitorIframe(iframe);
+        }
+      });
+    }
+
+    function isUrl(val = "") {
+      if (
+        /^http(s?):\/\//.test(val) ||
+        (val.includes(".") && val.substr(0, 1) !== " ")
+      ) {
+        return true;
+      }
+      return false;
+    }
+
+    function goBack() {
+      iframe.contentWindow.history.back();
+    }
+
+    function goForward() {
+      iframe.contentWindow.history.forward();
+    }
+
+    function reload() {
+      iframe.src = iframe.src;
+    }
+
+    function FS() {
+      if (iframe.contentDocument.fullscreenElement) {
+        iframe.contentDocument.exitFullscreen();
+      } else {
+        iframe.contentDocument.documentElement.requestFullscreen();
+      }
+    }
+  </script>
+</body>
+
+</html>

@@ -1,0 +1,14 @@
+{
+  "_comment": "JS Injection Configuration - Edit this file to add custom script injections",
+  "_usage": "Set 'enabled' to true to activate an injection rule",
+  "injections": [
+    {
+      "name": "Custom LoinoNote Script",
+      "url_pattern": "loilonote.app",
+      "js_urls": [
+        "assets/js/custom-loilonote.js"
+      ],
+      "enabled": true
+    }
+  ]
+}
