@@ -34,24 +34,55 @@ class JSInjector {
     const doc = iframe.contentDocument;
     
     injections.forEach(injection => {
-      injection.js_urls.forEach(jsUrl => {
-        // Check if script is already injected
-        const existingScript = doc.querySelector(`script[src="${jsUrl}"]`);
-        if (existingScript) return;
-
-        const script = doc.createElement('script');
-        script.src = jsUrl;
-        script.type = 'text/javascript';
-        script.onload = () => {
-          console.log(`Successfully injected: ${jsUrl}`);
-        };
-        script.onerror = () => {
-          console.error(`Failed to inject: ${jsUrl}`);
-        };
-        
-        doc.head.appendChild(script);
-      });
-    });
+          injection.js_urls.forEach(jsUrl => {
+            // Convert relative URLs to absolute URLs
+            const absoluteUrl = jsUrl.startsWith('http') ? jsUrl :
+              `${window.location.origin}/${jsUrl.replace(/^\/+/, '')}`;
+            
+            // Check if script is already injected
+            const existingScript = doc.querySelector(`script[data-injected-url="${jsUrl}"]`);
+            if (existingScript) return;
+    
+            // Try to fetch the script content and inject it directly
+            fetch(absoluteUrl)
+              .then(response => response.text())
+              .then(scriptContent => {
+                const script = doc.createElement('script');
+                script.type = 'text/javascript';
+                script.setAttribute('data-injected-url', jsUrl);
+                script.textContent = scriptContent;
+                
+                // Add error handling
+                try {
+                  doc.head.appendChild(script);
+                  console.log(`Successfully injected: ${jsUrl}`);
+                } catch (error) {
+                  console.error(`Failed to inject script: ${jsUrl}`, error);
+                }
+              })
+              .catch(error => {
+                console.error(`Failed to fetch script: ${jsUrl}`, error);
+                // Fallback: try injecting as external script
+                const script = doc.createElement('script');
+                script.src = absoluteUrl;
+                script.type = 'text/javascript';
+                script.setAttribute('data-injected-url', jsUrl);
+                script.crossOrigin = 'anonymous';
+                script.onload = () => {
+                  console.log(`Successfully injected (fallback): ${jsUrl}`);
+                };
+                script.onerror = () => {
+                  console.error(`Failed to inject (fallback): ${jsUrl}`);
+                };
+                
+                try {
+                  doc.head.appendChild(script);
+                } catch (error) {
+                  console.error(`Failed to append script: ${jsUrl}`, error);
+                }
+              });
+          });
+        });
   }
 
   // Monitor iframe URL changes and inject when needed
@@ -68,10 +99,10 @@ class JSInjector {
         const currentUrl = iframe.contentWindow.location.href;
         if (currentUrl !== lastUrl) {
           lastUrl = currentUrl;
-          // Wait a bit for the page to load
+          // Wait a bit more for the page to fully load
           setTimeout(() => {
             this.checkAndInject(iframe);
-          }, 1000);
+          }, 2000);
         }
       } catch (error) {
         // Cross-origin restrictions - this is expected
@@ -85,7 +116,18 @@ class JSInjector {
     iframe.addEventListener('load', () => {
       setTimeout(() => {
         this.checkAndInject(iframe);
-      }, 1000);
+      }, 1500);
+    });
+
+    // Add additional event listeners for better detection
+    iframe.addEventListener('loadstart', () => {
+      console.log('Iframe load started');
+    });
+
+    iframe.addEventListener('loadend', () => {
+      setTimeout(() => {
+        this.checkAndInject(iframe);
+      }, 500);
     });
   }
 

@@ -17,9 +17,34 @@ try {
   }
 }
 
-document.addEventListener("DOMContentLoaded", () => {
-  processUrl("https://loilonote.app/login");
+async function waitForServiceWorker() {
+  return new Promise((resolve) => {
+    if ('serviceWorker' in navigator) {
+      // Check if already registered
+      navigator.serviceWorker.getRegistration('/a/').then((registration) => {
+        if (registration) {
+          resolve();
+        } else {
+          // Wait for registration
+          navigator.serviceWorker.addEventListener('controllerchange', () => {
+            resolve();
+          });
+          
+          // Also listen for ready state
+          navigator.serviceWorker.ready.then(() => {
+            resolve();
+          });
+        }
+      });
+    } else {
+      resolve(); // Fallback if service worker not supported
+    }
+  });
+}
 
+document.addEventListener("DOMContentLoaded", async () => {
+  await waitForServiceWorker();
+  processUrl("https://loilonote.app/login");
 });
 
 function processUrl(value) {

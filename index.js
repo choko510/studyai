@@ -9,6 +9,8 @@ import express from "express";
 import basicAuth from "express-basic-auth";
 import mime from "mime";
 import fetch from "node-fetch";
+import multer from "multer";
+import { GoogleGenerativeAI } from "@google/generative-ai";
 import config from "./config.js";
 
 console.log(chalk.yellow("🚀 Starting server..."));
@@ -20,6 +22,22 @@ const bareServer = createBareServer("/ca/");
 const PORT = process.env.PORT || 8080;
 const cache = new Map();
 const CACHE_TTL = 30 * 24 * 60 * 60 * 1000; // Cache for 30 Days
+
+// Gemini AI の初期化
+const genAI = new GoogleGenerativeAI(config.geminiApiKey);
+
+// Multer の設定（メモリに画像を保存）
+const upload = multer({
+  storage: multer.memoryStorage(),
+  limits: { fileSize: 10 * 1024 * 1024 }, // 10MB制限
+  fileFilter: (req, file, cb) => {
+    if (file.mimetype.startsWith('image/')) {
+      cb(null, true);
+    } else {
+      cb(new Error('画像ファイルのみアップロード可能です'), false);
+    }
+  }
+});
 
 if (config.challenge !== false) {
   console.log(
@@ -96,12 +114,80 @@ app.use(express.urlencoded({ extended: true }));
 app.use(express.static(path.join(__dirname, "static")));
 app.use("/ca", cors({ origin: true }));
 
+// API エンドポイント
+app.use("/api", cors({ origin: true }));
+
+// API ルート - 画像解析
+app.post("/api/aireq", upload.single('image'), async (req, res) => {
+  try {
+    // 画像ファイルの確認
+    if (!req.file) {
+      return res.status(400).json({ error: "画像ファイルが必要です" });
+    }
+
+    // プロンプトの取得（オプション）
+    const prompt = req.body.prompt || "この画像について詳しく説明してください";
+
+    // ストリーミングレスポンスのヘッダー設定
+    res.setHeader('Content-Type', 'text/plain; charset=utf-8');
+    res.setHeader('Transfer-Encoding', 'chunked');
+    res.setHeader('Cache-Control', 'no-cache');
+    res.setHeader('Connection', 'keep-alive');
+
+    // 画像データを Base64 に変換
+    const imageData = {
+      inlineData: {
+        data: req.file.buffer.toString('base64'),
+        mimeType: req.file.mimetype
+      }
+    };
+
+    // Gemini Pro Vision モデルを取得
+    const model = genAI.getGenerativeModel({ model: "gemini-2.5-flash" });
+
+    // ストリーミングで生成開始
+    const result = await model.generateContentStream([prompt, imageData]);
+
+    // ストリーミングレスポンスを処理
+    for await (const chunk of result.stream) {
+      const chunkText = chunk.text();
+      if (chunkText) {
+        res.write(chunkText);
+      }
+    }
+
+    // ストリーミング終了
+    res.end();
+
+  } catch (error) {
+    console.error("Gemini API エラー:", error);
+    
+    // エラーレスポンス
+    if (!res.headersSent) {
+      res.status(500).json({
+        error: "画像解析中にエラーが発生しました",
+        details: error.message
+      });
+    } else {
+      res.write("\n\n[エラー: 画像解析中に問題が発生しました]");
+      res.end();
+    }
+  }
+});
+
+// API エラーハンドリング
+app.use("/api/*", (req, res) => {
+  res.status(404).json({
+    error: "APIエンドポイントが見つかりません",
+    path: req.path,
+    method: req.method,
+    availableEndpoints: [
+      "POST /api/aireq - 画像解析（画像ファイルとオプションのプロンプトを送信）"
+    ]
+  });
+});
+
 const routes = [
-  { path: "/b", file: "apps.html" },
-  { path: "/a", file: "games.html" },
-  { path: "/play.html", file: "games.html" },
-  { path: "/c", file: "settings.html" },
-  { path: "/d", file: "tabs.html" },
   { path: "/", file: "index.html" },
 ];
 

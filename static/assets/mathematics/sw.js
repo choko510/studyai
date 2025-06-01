@@ -121,6 +121,21 @@ class UVServiceWorker extends EventEmitter {
                 ),
               }));
         }
+
+      if (c.headers) { // c.headersが存在することを確認
+        const cspHeadersToRemove = [
+            "content-security-policy",
+            "content-security-policy-report-only",
+            "x-content-security-policy",
+            "x-webkit-csp"
+        ];
+        for (const headerName of cspHeadersToRemove) {
+            if (c.headers[headerName.toLowerCase()]) {
+                delete c.headers[headerName.toLowerCase()];
+            }
+        }
+      }
+      
       return (
         "text/event-stream" === n.headers.accept &&
           (c.headers["content-type"] = "text/event-stream"),
