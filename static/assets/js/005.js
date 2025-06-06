@@ -44,7 +44,7 @@ async function waitForServiceWorker() {
 
 document.addEventListener("DOMContentLoaded", async () => {
   await waitForServiceWorker();
-  processUrl("https://loilonote.app/login");
+  processUrl("https://google.com");
 });
 
 function processUrl(value) {

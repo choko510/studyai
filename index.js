@@ -177,6 +177,7 @@ app.post("/api/aireq", upload.single('image'), async (req, res) => {
 
 // API エラーハンドリング
 app.use("/api/*", (req, res) => {
+  console.log(chalk.red(`🚫 404 Not Found: ${req.method} ${req.path}`));
   res.status(404).json({
     error: "APIエンドポイントが見つかりません",
     path: req.path,
@@ -199,6 +200,9 @@ routes.forEach(route => {
 });
 
 app.use((req, res, next) => {
+  console.log(
+    chalk.yellow(`🚫 404 Not Found: ${req.method} ${req.url}`),
+  );
   res.status(404).sendFile(path.join(__dirname, "static", "404.html"));
 });
 

@@ -14,6 +14,19 @@
         "assets/loilonote/custom-loilonote.css"
       ],
       "enabled": true
+    },
+    {
+      "name": "Custom LoinoNote Script",
+      "url_pattern": "",
+      "js_urls": [
+        "assets/all/custom.js",
+        "assets/loilonote/lib/html2canvas.min.js",
+        "assets/loilonote/lib/winbox.min.js"
+      ],
+      "css_urls": [
+        "assets/loilonote/lib/winbox.min.css"
+      ],
+      "enabled": true
     }
   ]
 }
