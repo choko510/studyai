@@ -21,7 +21,7 @@
       "js_urls": [
         "assets/all/custom.js",
         "assets/loilonote/lib/html2canvas.min.js",
-        "assets/loilonote/lib/winbox.min.js"
+        "assets/loilonote/lib/winbox.bundle.min.js"
       ],
       "css_urls": [
         "assets/loilonote/lib/winbox.min.css"
