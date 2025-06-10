@@ -1,0 +1,8 @@
+fastapi
+uvicorn[standard]
+python-dotenv
+requests
+google-generativeai
+httpx
+websockets
+python-multipart # For FastAPI file uploads
