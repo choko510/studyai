@@ -37,7 +37,7 @@ async def resolve_and_filter_hostname(hostname: str, log_errors: bool = False, a
 
     allowed_ips = []
     try:
-        addr_infos = await asyncio.get_event_loop().getaddrinfo(
+        addr_infos = await asyncio.get_running_loop().getaddrinfo(
             hostname, None,
             type=socket.SOCK_STREAM
         )
