@@ -1,3 +1,4 @@
+import "dotenv/config";
 import fs from "node:fs";
 import http from "node:http";
 import path from "node:path";
@@ -143,7 +144,7 @@ app.post("/api/aireq", upload.single('image'), async (req, res) => {
     };
 
     // Gemini Pro Vision モデルを取得
-    const model = genAI.getGenerativeModel({ model: "gemini-2.5-flash" });
+    const model = genAI.getGenerativeModel({ model: "gemini-2.0-flash" });
 
     // ストリーミングで生成開始
     const result = await model.generateContentStream([prompt, imageData]);
@@ -175,6 +176,54 @@ app.post("/api/aireq", upload.single('image'), async (req, res) => {
   }
 });
 
+// API ルート - テキストのみの質問
+app.post("/api/text", async (req, res) => {
+  try {
+    const { message } = req.body;
+    
+    if (!message) {
+      return res.status(400).json({ error: "メッセージが必要です" });
+    }
+
+    // ストリーミングレスポンスのヘッダー設定
+    res.setHeader('Content-Type', 'text/plain; charset=utf-8');
+    res.setHeader('Transfer-Encoding', 'chunked');
+    res.setHeader('Cache-Control', 'no-cache');
+    res.setHeader('Connection', 'keep-alive');
+
+    // Gemini Pro モデルを取得
+    const model = genAI.getGenerativeModel({ model: "gemini-2.0-flash" });
+
+    // ストリーミングで生成開始
+    const result = await model.generateContentStream(message);
+
+    // ストリーミングレスポンスを処理
+    for await (const chunk of result.stream) {
+      const chunkText = chunk.text();
+      if (chunkText) {
+        res.write(chunkText);
+      }
+    }
+
+    // ストリーミング終了
+    res.end();
+
+  } catch (error) {
+    console.error("Gemini API エラー:", error);
+    
+    // エラーレスポンス
+    if (!res.headersSent) {
+      res.status(500).json({
+        error: "テキスト処理中にエラーが発生しました",
+        details: error.message
+      });
+    } else {
+      res.write("\n\n[エラー: テキスト処理中に問題が発生しました]");
+      res.end();
+    }
+  }
+});
+
 // API エラーハンドリング
 app.use("/api/*", (req, res) => {
   console.log(chalk.red(`🚫 404 Not Found: ${req.method} ${req.path}`));
@@ -183,7 +232,8 @@ app.use("/api/*", (req, res) => {
     path: req.path,
     method: req.method,
     availableEndpoints: [
-      "POST /api/aireq - 画像解析（画像ファイルとオプションのプロンプトを送信）"
+      "POST /api/aireq - 画像解析（画像ファイルとオプションのプロンプトを送信）",
+      "POST /api/text - テキストのみの質問（JSONで{\"message\": \"質問内容\"}を送信）"
     ]
   });
 });

@@ -4,9 +4,9 @@ importScripts("/assets/mathematics/bundle.js?v=2025-06-01");
 importScripts("/assets/mathematics/config.js?v=2025-06-01");
 importScripts(__uv$config.sw || "/assets/mathematics/sw.js?v=2025-06-01");
 
-// Service Worker バージョン
-const SW_VERSION = "v2025-06-01-api-bypass";
-console.log(`Service Worker ${SW_VERSION} loaded`);
+// Service Worker バージョン - iframe プロキシ対応
+const SW_VERSION = "v2025-06-01-iframe-proxy";
+console.log(`Service Worker ${SW_VERSION} loaded for iframe proxy`);
 
 const uv = new UVServiceWorker();
 const dynamic = new Dynamic();
@@ -20,7 +20,9 @@ let jsInjectionConfig = null;
 // Load JS injection config
 async function loadInjectionConfig() {
   try {
-    const response = await fetch('/js-injection-config.json');
+    const response = await fetch('/js-injection-config.json', {
+      headers: { 'X-Bypass-Proxy': 'true' }
+    });
     jsInjectionConfig = await response.json();
     console.log('JS injection config loaded:', jsInjectionConfig);
   } catch (error) {
@@ -44,7 +46,9 @@ async function getFileContent(fileUrl) {
   try {
     // Remove leading slash if present and fetch from local origin
     const cleanUrl = fileUrl.replace(/^\/+/, '');
-    const response = await fetch(`/${cleanUrl}`);
+    const response = await fetch(`/${cleanUrl}`, {
+      headers: { 'X-Bypass-Proxy': 'true' }
+    });
     return await response.text();
   } catch (error) {
     console.error(`Failed to fetch file: ${fileUrl}`, error);
@@ -52,10 +56,16 @@ async function getFileContent(fileUrl) {
   }
 }
 
-// Inject scripts and styles into HTML
+// Inject scripts and styles into HTML for iframe proxy
 async function injectResourcesIntoHtml(html, url) {
   const injections = shouldInjectScripts(url);
-  if (injections.length === 0) return html;
+  
+  console.log(`Processing HTML for iframe proxy URL: ${url}`);
+  
+  if (injections.length === 0) {
+    console.log(`No injections configured for URL: ${url} - allowing normal access`);
+    return html;
+  }
 
   let modifiedHtml = html;
   let injectedContent = '';
@@ -89,6 +99,91 @@ ${scriptContent}
       }
     }
   }
+
+  // iframe用の追加スクリプトを注入（フレームバスター回避 + URL同期）
+  const iframeScript = `
+<script>
+// iframe プロキシ用のフレームバスター回避とURL同期
+(function() {
+  // top と parent の参照を自身に置き換え
+  try {
+    if (window.top !== window.self) {
+      Object.defineProperty(window, 'top', {
+        get: function() { return window.self; },
+        configurable: false
+      });
+    }
+  } catch(e) {}
+  
+  try {
+    if (window.parent !== window.self) {
+      Object.defineProperty(window, 'parent', {
+        get: function() { return window.self; },
+        configurable: false
+      });
+    }
+  } catch(e) {}
+  
+  // URL変更を親フレームに通知
+  let lastUrl = window.location.href;
+  
+  function notifyUrlChange() {
+    const currentUrl = window.location.href;
+    if (currentUrl !== lastUrl) {
+      lastUrl = currentUrl;
+      try {
+        // 親フレームにURL変更を通知
+        if (window.parent && window.parent !== window) {
+          window.parent.postMessage({
+            type: 'url-changed',
+            url: currentUrl
+          }, '*');
+        }
+      } catch(e) {
+        console.log('Could not notify parent of URL change:', e);
+      }
+    }
+  }
+  
+  // URLの変更を監視
+  const originalPushState = history.pushState;
+  const originalReplaceState = history.replaceState;
+  
+  history.pushState = function() {
+    originalPushState.apply(history, arguments);
+    setTimeout(notifyUrlChange, 100);
+  };
+  
+  history.replaceState = function() {
+    originalReplaceState.apply(history, arguments);
+    setTimeout(notifyUrlChange, 100);
+  };
+  
+  // popstateイベントを監視
+  window.addEventListener('popstate', function() {
+    setTimeout(notifyUrlChange, 100);
+  });
+  
+  // 定期的にURL変更をチェック
+  setInterval(notifyUrlChange, 2000);
+  
+  // 初期URL通知
+  setTimeout(notifyUrlChange, 500);
+  
+  // location リダイレクトを防ぐ
+  const originalLocation = window.location;
+  Object.defineProperty(window, 'location', {
+    get: function() { return originalLocation; },
+    set: function(url) {
+      // iframe内での location 変更は許可
+      originalLocation.href = url;
+      setTimeout(notifyUrlChange, 100);
+    }
+  });
+})();
+</script>`;
+
+  injectedContent += iframeScript;
 
   // Insert content before closing head tag (preferred) or body tag
   if (injectedContent) {
@@ -132,41 +227,113 @@ self.addEventListener("fetch", event => {
         console.log('Bypassing proxy for same-origin request:', url);
         return await fetch(event.request);
       }
+      
+      // Googleのトラッキングリクエストを特別に処理
+      if (url.includes('gen_204') || url.includes('client_204') || url.includes('_/js/') || url.includes('favicon.ico')) {
+        console.log('Bypassing tracking/resource request:', url);
+        return await fetch(event.request, { mode: 'no-cors' });
+      }
 
       if (await dynamic.route(event)) {
         return await dynamic.fetch(event);
       }
 
       if (url.startsWith(`${location.origin}/a/`)) {
-        const response = await uv.fetch(event);
-        
-        // Check if this is an HTML response that might need script injection
-        const contentType = response.headers.get('content-type') || '';
-        if (contentType.includes('text/html')) {
-          try {
-            // Extract the original URL from the proxied request
-            const uvUrl = event.request.url;
-            const decodedUrl = __uv$config.decodeUrl ?
-              __uv$config.decodeUrl(uvUrl.split('/a/')[1]) :
-              decodeURIComponent(uvUrl.split('/a/')[1]);
-            
-            const html = await response.text();
-            const modifiedHtml = await injectResourcesIntoHtml(html, decodedUrl);
-            
-            if (modifiedHtml !== html) {
-              console.log(`Injected scripts into: ${decodedUrl}`);
+        try {
+          const response = await uv.fetch(event);
+          
+          // iframe プロキシ用のヘッダーを設定（全てのレスポンスに適用）
+          const newHeaders = new Headers(response.headers);
+          newHeaders.delete('X-Frame-Options');
+          newHeaders.delete('Content-Security-Policy');
+          newHeaders.set('X-Frame-Options', 'ALLOWALL');
+          
+          // HTMLレスポンスの場合のみスクリプト注入を試行
+          const contentType = response.headers.get('content-type') || '';
+          if (contentType.includes('text/html') && response.status >= 200 && response.status < 300) {
+            try {
+              const html = await response.text();
+              
+              // フレームバスター回避とURL同期スクリプトを注入
+              const urlSyncScript = `<script>
+                // iframe プロキシ用のフレームバスター回避とURL同期
+                (function() {
+                  try {
+                    if (window.top !== window.self) {
+                      Object.defineProperty(window, 'top', { get: () => window.self });
+                      Object.defineProperty(window, 'parent', { get: () => window.self });
+                    }
+                  } catch(e) {}
+                  
+                  // URL変更を親フレームに通知
+                  let lastUrl = window.location.href;
+                  
+                  function notifyUrlChange() {
+                    const currentUrl = window.location.href;
+                    if (currentUrl !== lastUrl) {
+                      lastUrl = currentUrl;
+                      try {
+                        if (window.parent && window.parent !== window) {
+                          window.parent.postMessage({
+                            type: 'url-changed',
+                            url: currentUrl
+                          }, '*');
+                        }
+                      } catch(e) {}
+                    }
+                  }
+                  
+                  // URLの変更を監視
+                  const originalPushState = history.pushState;
+                  const originalReplaceState = history.replaceState;
+                  
+                  history.pushState = function() {
+                    originalPushState.apply(history, arguments);
+                    setTimeout(notifyUrlChange, 100);
+                  };
+                  
+                  history.replaceState = function() {
+                    originalReplaceState.apply(history, arguments);
+                    setTimeout(notifyUrlChange, 100);
+                  };
+                  
+                  window.addEventListener('popstate', notifyUrlChange);
+                  setInterval(notifyUrlChange, 2000);
+                  setTimeout(notifyUrlChange, 500);
+                })();
+              </script>`;
+              
+              const modifiedHtml = html.replace(
+                /<head>/i,
+                `<head>${urlSyncScript}`
+              );
+              
               return new Response(modifiedHtml, {
                 status: response.status,
                 statusText: response.statusText,
-                headers: response.headers
+                headers: newHeaders
+              });
+            } catch (htmlError) {
+              console.log('HTML processing failed, returning original response');
+              return new Response(response.body, {
+                status: response.status,
+                statusText: response.statusText,
+                headers: newHeaders
               });
             }
-          } catch (error) {
-            console.error('Error during script injection:', error);
           }
+          
+          // HTML以外はヘッダー修正のみで返す
+          return new Response(response.body, {
+            status: response.status,
+            statusText: response.statusText,
+            headers: newHeaders
+          });
+          
+        } catch (error) {
+          console.error('Proxy request failed:', error);
+          return new Response('Proxy Error', { status: 500 });
         }
-        
-        return response;
       }
 
       return await fetch(event.request);

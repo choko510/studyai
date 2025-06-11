@@ -24,6 +24,24 @@
 - Now.gg Support
 - Fast Speeds
 - Geforce NOW Support
+- AI Assistant with Image Analysis (Powered by Google Gemini)
+
+## AI Assistant Setup
+
+This project includes an AI assistant feature powered by Google Gemini AI. To use this feature:
+
+1. Get a free API key from [Google AI Studio](https://makersuite.google.com/app/apikey)
+2. Create a `.env` file in the project root (or edit the existing one)
+3. Add your API key to the `.env` file:
+   ```
+   GEMINI_API_KEY=your_api_key_here
+   ```
+4. The AI assistant supports:
+   - Text-based conversations
+   - Image analysis and description
+   - Streaming responses for real-time interaction
+
+Click the "AI質問" button in the navigation bar to open the AI chat panel.
 
 ## Deployment
 
