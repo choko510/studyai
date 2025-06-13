@@ -21,12 +21,12 @@
     "cookie-parser": "^1.4.7",
     "cors": "^2.8.5",
     "dotenv": "^16.5.0",
-    "express": "^4.19.2",
+    "express": "^5.1.0",
     "express-basic-auth": "^1.2.1",
     "mime": "^4.0.7",
     "multer": "^2.0.1",
     "node-fetch": "^3.3.2",
-    "ws": "^8.14.2"
+    "ws": "^8.18.2"
   },
   "devDependencies": {
     "@biomejs/biome": "1.9.4"
