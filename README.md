@@ -1,159 +1,285 @@
-<div align="center">
-    <img src="https://raw.githubusercontent.com/UseInterstellar/Interstellar/main/.github/branding/in.png">
-    <p>Serving over 8+ million users since 2023.<p>
-    <p>Interstellar is a web proxy with a Clean and Sleek UI and easy to use menus. Our goal is to provide the best user experience to everyone.</p>
-</div>
+# AIBrowser - AI統合型ブラウザプロキシ
 
-![inpreview](https://github.com/UseInterstellar/Interstellar/assets/89202835/2669efed-5186-4932-83c4-725acae60bd2)
+![Version](https://img.shields.io/badge/version-5.2.5-blue.svg)
+![Node.js](https://img.shields.io/badge/node.js-16%2B-green.svg)
+![License](https://img.shields.io/badge/license-GPL--3.0-red.svg)
 
-> [!IMPORTANT]
-> If you fork this project, consider giving it a star in the original repository!
+AIBrowserは、Google Gemini AIを統合した次世代ブラウザプロキシです。画面上で範囲を囲んで検索したり、AIに質問したりできる革新的な機能を提供します。
 
-**Join Our [Discord Community](https://discord.gg/interstellar) for support, more links, and an active community!**
+## 🌟 主な機能
 
-## Features
+### 🤖 AI画像解析
+- **Gemini 2.0 Flash**を使用した高精度な画像解析
+- スクリーンショットの自動解析
+- 数学問題の解説とステップバイステップの解答
+- LaTeX数式レンダリング対応
 
-- About:Blank Cloaking
-- Tab Cloaking
-- Wide collection of apps & games
-- Clean, Easy to use UI
-- Inspect Element
-- Various Themes
-- Password Protection (Optional)
-- Built-in Tab System
-- Now.gg Support
-- Fast Speeds
-- Geforce NOW Support
-- AI Assistant with Image Analysis (Powered by Google Gemini)
+### 🖼️ インタラクティブなマーキング機能
+- 画面上で右クリックして範囲を囲む
+- 囲んだ範囲を自動でAIに送信・解析
+- リアルタイムでの範囲検出
 
-## AI Assistant Setup
+### 💬 リアルタイムAIチャット
+- ストリーミング形式でのAI応答
+- 会話履歴の保持（24時間）
+- 画像アップロード対応
+- Markdown形式での回答表示
 
-This project includes an AI assistant feature powered by Google Gemini AI. To use this feature:
+### 🌐 高性能ウェブプロキシ
+- Bare Serverを使用した安全なプロキシ機能
+- 複数のアセットソース対応
+- キャッシュ機能付き（30日間）
 
-1. Get a free API key from [Google AI Studio](https://makersuite.google.com/app/apikey)
-2. Create a `.env` file in the project root (or edit the existing one)
-3. Add your API key to the `.env` file:
-   ```
-   GEMINI_API_KEY=your_api_key_here
-   ```
-4. The AI assistant supports:
-   - Text-based conversations
-   - Image analysis and description
-   - Streaming responses for real-time interaction
+### 📊 数学式レンダリング
+- MathJax統合によるLaTeX数式表示
+- インライン数式とディスプレイ数式両対応
+- リアルタイムレンダリング
 
-Click the "AI質問" button in the navigation bar to open the AI chat panel.
+## 🚀 インストール
 
-## Deployment
+### 前提条件
+- Node.js 16.0.0以上
+- npm 7.0.0以上
+- Google Gemini APIキー
 
-> [!IMPORTANT]
-> You **cannot** deploy to static web hosts, including Netlify, Cloudflare Pages, and GitHub Pages.
+### インストール手順
 
-### Password Protection
-
-1. Go to the `config.js` file and set `challenge` to **true**. Then, set the environment variable as follows:
-2. For PNPM: Run either `config=true pnpm start` or `$env:config=true; pnpm start`, depending on your server.
-3. For Bun: Run either `config=true bun start` or `$env:config=true; bun start` if you prefer Bun.
-4. For NPM: Run either `config=true npm start` or `$env:config=true; npm start` if you prefer NPM.
-
-
-### Server Deployment
-
-You must run these commands on your server:
-
+1. **リポジトリのクローン**
 ```bash
-git clone https://github.com/UseInterstellar/Interstellar
-cd Interstellar
+git clone https://github.com/your-username/AIBrowser.git
+cd AIBrowser
 ```
 
-#### Ad-Free Deployment
-
+2. **依存関係のインストール**
 ```bash
-git clone --branch Ad-Free https://github.com/UseInterstellar/Interstellar
-cd Interstellar
+# npmを使用する場合
+npm install
+
+# pnpmを使用する場合（推奨）
+pnpm install
 ```
 
-Next depending on your package manager, run one of the following commands:
-
-#### Bun
-
-If you are using Bun, run the following commands:
-
+3. **環境変数の設定**
 ```bash
-bun i
-bun start
+# .envファイルを作成
+cp .env.example .env
 ```
 
-#### pnpm
-
-If you are using pnpm, run the following commands:
-
-```bash
-pnpm i
-pnpm start
+`.env`ファイルに以下を設定：
+```env
+GEMINI_API_KEY=your_gemini_api_key_here
+PORT=8080
 ```
 
-#### npm
-
-If you are using npm, run the following commands:
-
+4. **サーバーの起動**
 ```bash
-npm i
-npm run start
+# 本番環境
+npm start
+
+# 開発環境（ホットリロード）
+npm run dev
 ```
 
-### Updating
+## ⚙️ 設定
 
-```bash
-cd Interstellar
-git pull --force --allow-unrelated-histories # This may overwrite your local changes
+### config.js設定オプション
+
+```javascript
+const config = {
+  // パスワード保護の有効/無効
+  challenge: false, // trueに設定すると認証が必要
+  
+  // ユーザー認証情報
+  users: {
+    username: "password"
+  },
+  
+  // Gemini APIキー
+  geminiApiKey: process.env.GEMINI_API_KEY || "YOUR_GEMINI_API_KEY_HERE"
+};
 ```
 
-<a target="_blank" href="https://heroku.com/deploy/?template=https://github.com/UseInterstellar/Interstellar"><img alt="Deploy to Heroku" src="https://binbashbanana.github.io/deploy-buttons/buttons/remade/heroku.svg"></a>
-<a target="_blank" href="https://app.koyeb.com/deploy?type=git&repository=github.com/UseInterstellar/Interstellar"><img alt="Deploy to Koyeb" src="https://binbashbanana.github.io/deploy-buttons/buttons/remade/koyeb.svg"></a>
+### パスワード保護の有効化
 
-### Deployment Alternatives
+セキュリティを強化したい場合：
 
-For more deployment options, join our [Discord Server](https://discord.gg/interstellar) for various ways to deploy Interstellar.
-This includes methods of deploying to Render/OnRender.
+1. `config.js`で`challenge: true`に設定
+2. `users`オブジェクトにユーザー名とパスワードを追加
+3. サーバーを再起動
 
-#### What happened to Replit Deployment?
+## 📖 使用方法
 
-As of January 1st, 2024, Replit is [no longer free](https://blog.replit.com/hosting-changes). Try GitHub Codespaces instead.
+### 基本的なブラウジング
 
-### GitHub Codespaces
+1. ブラウザで`http://localhost:8080`にアクセス
+2. URL入力欄にアクセスしたいウェブサイトのURLを入力
+3. 「移動」ボタンをクリック
 
-> [!NOTE]
-> If you're setting the port below 1023, then you must run `sudo PORT=1023`
+### AI機能の使用
 
-1. Create a GitHub account if you haven't already.
-2. Click "Code" (green button) and then "Create Codespace on main."
-3. In the terminal at the bottom, paste `pnpm i && pnpm start`.
-4. Respond to the application popup by clicking "Make public."
-> [!IMPORTANT]
-> Make sure you click the "Make public." button, or the proxy won't function properly.<br>
-> If you get a Range Error, go back and make sure you clicked Make public!
-5. Access the deployed website from the ports tab.
-6. For subsequent uses in the same codespace, just run `pnpm start`
+#### 画面マーキング機能
+1. ウェブページを表示
+2. 解析したい部分で**右クリック**してドラッグ
+3. 範囲を囲んで閉じた図形を作成
+4. 確認ダイアログで「はい」をクリック
+5. AIが自動で範囲を解析し、説明を提供
 
-### Solution for if there is no popup.
+#### AIチャット機能
+1. 「AI質問」ボタンをクリック
+2. チャット窓が開く
+3. テキストで質問するか、画像をアップロード
+4. リアルタイムでAIの回答を確認
 
-1. Run `pnpm i`, and before `pnpm start`, prepend `PORT=8080`, replacing 8080 with another port. For example, `PORT=6969 pnpm start`.
-2. If this does not work then you can prepend `$env:PORT=8080;`, replacing 8080 with another port. For example, `$env:PORT=6969; pnpm start`
-3. Go to the ports tab, Click Forward A Port, And type the port number.
-4. Right-click Visibility and set Port Visibility to Public.
+#### スクリーンキャプチャ
+1. AIチャット内の📷ボタンをクリック
+2. 画面共有を許可
+3. メッセージ送信時に現在の画面も自動送信
 
-> [!NOTE]
-> We are committed to making Interstellar easy and personalized however, as of now we need your support in making it ad-free. Consider keeping ads so Interstellar can run freely or contribute by being a supporter.
+## 🔧 API仕様
 
-## Report Issues
+### POST /api/aireq
+画像解析API
 
-If you encounter problems, open an issue on GitHub, and we'll address it promptly.
+**パラメータ:**
+- `image`: 画像ファイル（multipart/form-data）
+- `prompt`: 分析のプロンプト（オプション）
+- `sessionId`: セッションID（オプション）
 
-> [!TIP]
-> If you're having trouble, don't hesitate to reach out to us on [Discord](https://discord.gg/interstellar) for personalized support.
+**レスポンス:**
+- ストリーミング形式のJSON
+- `type: 'content'`: コンテンツデータ
+- `type: 'sessionId'`: セッションID
+- `type: 'end'`: ストリーム終了
 
-# Credits
+### POST /api/text
+テキスト質問API
 
-A huge thanks goes out to all of the people who have contributed to Interstellar.
+**パラメータ:**
+```json
+{
+  "message": "質問内容",
+  "sessionId": "セッションID（オプション）"
+}
+```
 
-[![Contributors](https://contrib.rocks/image?repo=UseInterstellar/Interstellar)](https://github.com/UseInterstellar/Interstellar/graphs/contributors)
+**レスポンス:**
+- ストリーミング形式のJSON応答
+
+## 🏗️ 技術仕様
+
+### アーキテクチャ
+
+```
+┌─────────────────┐    ┌─────────────────┐    ┌─────────────────┐
+│   フロントエンド   │ ←→ │   Express.js    │ ←→ │   Gemini API    │
+│   (Vanilla JS)   │    │     サーバー      │    │                 │
+└─────────────────┘    └─────────────────┘    └─────────────────┘
+         ↕                       ↕
+┌─────────────────┐    ┌─────────────────┐
+│   Bare Server   │    │   Static Files  │
+│    (プロキシ)     │    │   (HTML/CSS)    │
+└─────────────────┘    └─────────────────┘
+```
+
+### 使用技術
+
+**バックエンド:**
+- Node.js & Express.js
+- Google Generative AI SDK
+- Bare Server Node
+- Multer（ファイルアップロード）
+- Cookie Parser, CORS
+
+**フロントエンド:**
+- HTML5, CSS3, Vanilla JavaScript
+- MathJax（数式レンダリング）
+- Marked（Markdownパーサー）
+- DOMPurify（XSS防止）
+- WinBox（ウィンドウ管理）
+- Dom-to-Image（画面キャプチャ）
+
+### パフォーマンス特性
+
+- **キャッシュ**: 30日間のアセットキャッシュ
+- **セッション管理**: 24時間の会話履歴保持
+- **メモリ効率**: ストリーミングレスポンスによる低メモリ使用
+- **セキュリティ**: DOMPurifyによるXSS防止
+
+## 🎯 使用シナリオ
+
+### 学習・教育
+- 数学問題のステップバイステップ解説
+- 画像内のテキストや図表の解析
+- リアルタイムでの学習サポート
+
+### 研究・分析  
+- ウェブページの特定部分の詳細分析
+- 画像データの自動解析
+- 多言語コンテンツの理解
+
+### 開発・デバッグ
+- エラーメッセージの解析
+- コードスニペットの説明
+- UI/UXの改善提案
+
+## 🚨 注意事項
+
+1. **APIキー**: Gemini APIキーは適切に管理してください
+2. **リソース**: 画像解析は計算リソースを消費します
+3. **プライバシー**: アップロード画像は適切に処理されます
+4. **レート制限**: Gemini APIのレート制限にご注意ください
+
+## 🛠️ 開発者向け情報
+
+### 開発コマンド
+
+```bash
+# コードフォーマット
+npm run format
+
+# リンティング
+npm run lint
+
+# プリコミットチェック
+npm run precommit
+```
+
+### ファイル構造
+
+```
+AIBrowser/
+├── index.js              # メインサーバーファイル
+├── config.js             # 設定ファイル
+├── package.json          # プロジェクト設定
+├── static/               # 静的ファイル
+│   ├── index.html        # メインHTML
+│   ├── assets/
+│   │   ├── css/          # スタイルシート
+│   │   ├── js/           # JavaScript
+│   │   └── mathematics/  # 数学関連
+│   └── manifest.json     # PWA設定
+└── README.md            # このファイル
+```
+
+## 📝 ライセンス
+
+このプロジェクトはGPL-3.0ライセンスの下で公開されています。
+
+## 🙏 クレジット
+
+- **開発者**: AIBrowserNetwork
+- **AI**: Google Gemini 2.0 Flash
+- **プロキシ**: Nebula Services Bare Server
+- **UI**: WinBox by nextapps-de
+
+## 🆘 サポート
+
+問題が発生した場合や質問がある場合は、以下の方法でサポートを受けられます：
+
+1. **Issues**: GitHub Issuesで問題を報告
+2. **Documentation**: このREADMEファイルを参照
+3. **Community**: プロジェクトコミュニティに参加
+
+---
+
+**AIBrowser**で、AI統合型ブラウジングエクスペリエンスをお楽しみください！ 🚀✨

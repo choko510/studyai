@@ -12,6 +12,7 @@ import mime from "mime";
 import fetch from "node-fetch";
 import multer from "multer";
 import { GoogleGenerativeAI } from "@google/generative-ai";
+import { WebSocketServer, WebSocket } from 'ws';
 import config from "./config.js";
 
 console.log(chalk.yellow("🚀 Starting server..."));
@@ -21,6 +22,7 @@ const server = http.createServer();
 const app = express();
 const bareServer = createBareServer("/ca/");
 const PORT = process.env.PORT || 8080;
+const PYTHON_BACKEND_URL = process.env.PYTHON_BACKEND_URL || 'http://localhost:8000';
 const cache = new Map();
 const CACHE_TTL = 30 * 24 * 60 * 60 * 1000; // Cache for 30 Days
 
@@ -403,6 +405,149 @@ app.post("/api/text", async (req, res) => {
       res.end();
     }
   }
+});
+
+// 音声認識API - Pythonバックエンドへのプロキシ
+app.post("/api/speech-to-text", upload.single('audio'), async (req, res) => {
+  try {
+    if (!req.file) {
+      return res.status(400).json({ error: "音声ファイルが必要です" });
+    }
+
+    // Pythonバックエンドの/ttsエンドポイントにリクエストを転送
+    const formData = new FormData();
+    formData.append('audio', new Blob([req.file.buffer]), req.file.originalname);
+
+    const response = await fetch(`${PYTHON_BACKEND_URL}/ws`, {
+      method: 'POST',
+      body: formData,
+      headers: {
+        ...formData.getHeaders?.() || {}
+      }
+    });
+
+    if (!response.ok) {
+      throw new Error(`Python backend responded with status: ${response.status}`);
+    }
+
+    const result = await response.json();
+    res.json(result);
+
+  } catch (error) {
+    console.error("音声認識エラー:", error);
+    res.status(500).json({
+      error: "音声認識中にエラーが発生しました",
+      details: error.message
+    });
+  }
+});
+
+// テキスト読み上げAPI - Pythonバックエンドへのプロキシ
+app.post("/api/text-to-speech", async (req, res) => {
+  try {
+    const { text } = req.body;
+    
+    if (!text) {
+      return res.status(400).json({ error: "テキストが必要です" });
+    }
+
+    // Pythonバックエンドの/ttsエンドポイントにリクエストを転送
+    const response = await fetch(`${PYTHON_BACKEND_URL}/tts`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ text })
+    });
+
+    if (!response.ok) {
+      throw new Error(`Python backend responded with status: ${response.status}`);
+    }
+
+    // 音声データをそのまま返す
+    const audioBuffer = await response.arrayBuffer();
+    res.set({
+      'Content-Type': 'audio/mpeg',
+      'Content-Length': audioBuffer.byteLength
+    });
+    res.send(Buffer.from(audioBuffer));
+
+  } catch (error) {
+    console.error("テキスト読み上げエラー:", error);
+    res.status(500).json({
+      error: "テキスト読み上げ中にエラーが発生しました",
+      details: error.message
+    });
+  }
+});
+
+// WebSocket プロキシ - 音声認識のリアルタイム通信
+const wss = new WebSocketServer({ server, path: '/ws/speech' });
+
+wss.on('connection', (ws, req) => {
+  console.log('WebSocket接続が確立されました（音声認識用）');
+  
+  // Pythonバックエンドへの接続を確立
+  let pythonWs;
+  
+  try {
+    // WebSocketでPythonバックエンドに接続
+    pythonWs = new WebSocket(`ws://localhost:8000/ws`);
+    
+    pythonWs.on('open', () => {
+      console.log('Pythonバックエンドとの接続が確立されました');
+    });
+    
+    pythonWs.on('message', (data) => {
+      // Pythonバックエンドからのメッセージをクライアントに転送
+      if (ws.readyState === ws.OPEN) {
+        ws.send(data);
+      }
+    });
+    
+    pythonWs.on('error', (error) => {
+      console.error('Pythonバックエンド接続エラー:', error);
+      if (ws.readyState === ws.OPEN) {
+        ws.send(JSON.stringify({ error: 'バックエンド接続エラー' }));
+      }
+    });
+    
+    pythonWs.on('close', () => {
+      console.log('Pythonバックエンドとの接続が閉じられました');
+      if (ws.readyState === ws.OPEN) {
+        ws.close();
+      }
+    });
+    
+  } catch (error) {
+    console.error('Pythonバックエンドへの接続に失敗:', error);
+    if (ws.readyState === ws.OPEN) {
+      ws.send(JSON.stringify({ error: 'バックエンドへの接続に失敗しました' }));
+      ws.close();
+    }
+    return;
+  }
+  
+  ws.on('message', (message) => {
+    // クライアントからのメッセージをPythonバックエンドに転送
+    if (pythonWs && pythonWs.readyState === pythonWs.OPEN) {
+      pythonWs.send(message);
+    }
+  });
+  
+  ws.on('close', () => {
+    console.log('クライアントWebSocket接続が閉じられました');
+    if (pythonWs && pythonWs.readyState === pythonWs.OPEN) {
+      pythonWs.close();
+    }
+  });
+  
+  ws.on('error', (error) => {
+    console.error('WebSocketエラー:', error);
+    if (pythonWs && pythonWs.readyState === pythonWs.OPEN) {
+      pythonWs.close();
+    }
+  });
 });
 
 // API エラーハンドリング
