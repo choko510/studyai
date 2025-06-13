@@ -191,6 +191,126 @@
       border-radius: 6px;
       display: none;
     }
+    
+    /* Markdown content styling */
+    .markdown-content h1, .markdown-content h2, .markdown-content h3,
+    .markdown-content h4, .markdown-content h5, .markdown-content h6 {
+      margin: 0.5em 0 0.3em 0;
+      font-weight: 600;
+      line-height: 1.3;
+    }
+    
+    .markdown-content h1 { font-size: 1.2em; }
+    .markdown-content h2 { font-size: 1.1em; }
+    .markdown-content h3 { font-size: 1.05em; }
+    .markdown-content h4, .markdown-content h5, .markdown-content h6 { font-size: 1em; }
+    
+    .markdown-content p {
+      margin: 0.5em 0;
+      line-height: 1.5;
+    }
+    
+    .markdown-content ul, .markdown-content ol {
+      margin: 0.5em 0;
+      padding-left: 1.5em;
+    }
+    
+    .markdown-content li {
+      margin: 0.2em 0;
+    }
+    
+    .markdown-content blockquote {
+      margin: 0.5em 0;
+      padding: 0.5em 1em;
+      border-left: 3px solid #d1d5db;
+      background: #f9fafb;
+      font-style: italic;
+    }
+    
+    .markdown-content code {
+      background: #f1f5f9;
+      padding: 0.1em 0.3em;
+      border-radius: 3px;
+      font-family: 'Courier New', monospace;
+      font-size: 0.9em;
+    }
+    
+    .markdown-content pre {
+      background: #1f2937;
+      color: #f9fafb;
+      padding: 1em;
+      border-radius: 6px;
+      overflow-x: auto;
+      margin: 0.5em 0;
+    }
+    
+    .markdown-content pre code {
+      background: transparent;
+      padding: 0;
+      color: inherit;
+    }
+    
+    .markdown-content strong {
+      font-weight: 600;
+    }
+    
+    .markdown-content em {
+      font-style: italic;
+    }
+    
+    .markdown-content a {
+      color: #3b82f6;
+      text-decoration: underline;
+    }
+    
+    .markdown-content a:hover {
+      color: #2563eb;
+    }
+    
+    .markdown-content table {
+      border-collapse: collapse;
+      width: 100%;
+      margin: 0.5em 0;
+    }
+    
+    .markdown-content th, .markdown-content td {
+      border: 1px solid #d1d5db;
+      padding: 0.4em 0.8em;
+      text-align: left;
+    }
+    
+    .markdown-content th {
+      background: #f9fafb;
+      font-weight: 600;
+    }
+    
+    /* LaTeX数式のスタイリング */
+    .MathJax {
+      font-size: 1em !important;
+    }
+    
+    .MathJax_Display {
+      margin: 0.8em 0 !important;
+      text-align: center !important;
+    }
+    
+    .MathJax_Preview {
+      color: #888;
+      font-style: italic;
+    }
+    
+    /* インライン数式のスタイル */
+    .markdown-content .MathJax {
+      display: inline-block !important;
+      margin: 0 0.1em !important;
+    }
+    
+    /* ブロック数式のスタイル */
+    .markdown-content .MathJax_Display {
+      display: block !important;
+      margin: 1em 0 !important;
+      text-align: center !important;
+    }
   </style>
 </head>
 
@@ -221,8 +341,27 @@
   <link href="https://cdn.jsdelivr.net/npm/dom-to-image-more@3.6.0/spec/resources/fonts/web-fonts/embedded.min.css" rel="stylesheet">
   <script src="https://cdn.jsdelivr.net/npm/winbox@0.2.82/dist/winbox.bundle.min.js"></script>
   <link href="https://cdn.jsdelivr.net/npm/winbox@0.2.82/dist/css/winbox.min.css" rel="stylesheet">
+  <script src="https://cdn.jsdelivr.net/npm/marked@15.0.12/marked.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/dompurify@3.0.5/dist/purify.min.js"></script>
+  <script src="https://polyfill.io/v3/polyfill.min.js?features=es6"></script>
+  <script id="MathJax-script" async src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script>
 
   <script>
+    // MathJax設定
+    window.MathJax = {
+      tex: {
+        inlineMath: [['$', '$'], ['\\(', '\\)']],
+        displayMath: [['$$', '$$'], ['\\[', '\\]']],
+        processEscapes: true,
+        processEnvironments: true
+      },
+      options: {
+        skipHtmlTags: ['script', 'noscript', 'style', 'textarea', 'pre'],
+        ignoreHtmlClass: 'tex2jax_ignore',
+        processHtmlClass: 'tex2jax_process'
+      }
+    };
+
     // Service Workerをiframeプロキシ用に登録
     if ('serviceWorker' in navigator) {
       window.addEventListener('load', () => {
@@ -385,8 +524,10 @@
         const yesBtn = dialog.querySelector('#confirm-yes');
         const noBtn = dialog.querySelector('#confirm-no');
 
-        yesBtn.addEventListener('click', () => {
-            captureMarkedArea(doc, markerPath);
+        yesBtn.addEventListener('click', async () => {
+            // ダイアログを即座に非表示にしてからキャプチャ実行
+            dialog.style.display = 'none';
+            await captureMarkedArea(doc, markerPath);
             clearMarker(); // マーカーを消去
             dialog.remove();
         });
@@ -396,18 +537,27 @@
             dialog.remove();
         });
 
-        // 3秒後に自動で閉じる（マーカーも消去）
+        // 5秒後に自動で閉じる（マーカーも消去）- 少し長めに設定
         setTimeout(() => {
             if (dialog.parentNode) {
                 clearMarker();
                 dialog.remove();
             }
-        }, 3000);
+        }, 5000);
     }
 
     // マーカーで囲まれた範囲をキャプチャしてAIに送信
     async function captureMarkedArea(doc, markerPath) {
         try {
+            // 確認ダイアログを非表示にする（スクリーンショットに映り込まないように）
+            const existingDialog = doc.getElementById('marker-confirm-dialog');
+            if (existingDialog) {
+                existingDialog.style.display = 'none';
+            }
+            
+            // 少し待ってからキャプチャを実行（ダイアログが完全に非表示になるまで）
+            await new Promise(resolve => setTimeout(resolve, 100));
+
             // マーカーパスのバウンディングボックスを計算
             const minX = Math.min(...markerPath.map(p => p.x));
             const maxX = Math.max(...markerPath.map(p => p.x));
@@ -514,6 +664,11 @@
             } else {
                 alert('スクリーンキャプチャが有効ではありません。AIチャットでスクリーンキャプチャを有効にしてください。');
             }
+            
+            // キャプチャ完了後にダイアログを削除
+            if (existingDialog) {
+                existingDialog.remove();
+            }
         } catch (error) {
             console.error('マーカー範囲キャプチャエラー:', error);
             alert('範囲のキャプチャに失敗しました。');
@@ -573,6 +728,61 @@
         });
     }
 
+    // Markdownをレンダリングする関数（LaTeX対応）
+    function renderMarkdown(text) {
+        if (typeof marked === 'undefined' || typeof DOMPurify === 'undefined') {
+            // ライブラリが読み込まれていない場合は通常のテキストとして表示
+            return text;
+        }
+        
+        try {
+            // Markedの設定
+            marked.setOptions({
+                breaks: true, // 改行を<br>に変換
+                gfm: true,    // GitHub Flavored Markdown
+                headerIds: false, // ヘッダーIDを無効化（セキュリティのため）
+                mangle: false     // メールアドレスの難読化を無効化
+            });
+            
+            // MarkdownをHTMLに変換
+            const html = marked.parse(text);
+            
+            // XSS攻撃を防ぐためにDOMPurifyでサニタイズ
+            const cleanHtml = DOMPurify.sanitize(html, {
+                ALLOWED_TAGS: [
+                    'p', 'br', 'strong', 'em', 'u', 'del', 's', 'mark',
+                    'h1', 'h2', 'h3', 'h4', 'h5', 'h6',
+                    'ul', 'ol', 'li',
+                    'blockquote',
+                    'code', 'pre',
+                    'a', 'img',
+                    'table', 'thead', 'tbody', 'tr', 'th', 'td',
+                    // MathJax用のタグを許可
+                    'span', 'div'
+                ],
+                ALLOWED_ATTR: [
+                    'href', 'src', 'alt', 'title', 'target', 'rel',
+                    // MathJax用の属性を許可
+                    'class', 'id', 'data-*'
+                ],
+                ALLOWED_URI_REGEXP: /^(?:(?:(?:f|ht)tps?|mailto|tel|callto|cid|xmpp):|[^a-z]|[a-z+.\-]+(?:[^a-z+.\-:]|$))/i
+            });
+            
+            return cleanHtml;
+        } catch (error) {
+            console.error('Markdown rendering error:', error);
+            return text;
+        }
+    }
+
+    // MathJaxでLaTeX数式をレンダリングする関数
+    function renderMathInElement(element) {
+        if (typeof MathJax !== 'undefined' && MathJax.typesetPromise) {
+            MathJax.typesetPromise([element]).catch((err) => {
+                console.error('MathJax rendering error:', err);
+            });
+        }
+    }
 
     // AI Chat functionality
     let chatHistory = []; // チャット履歴を保存
@@ -705,8 +915,14 @@
                         boxShadow: '0 1px 3px rgba(0,0,0,0.1)',
                         color: '#374151'
                     });
-                    aiMsg.textContent = item.content;
+                    
+                    // MarkdownをHTMLとしてレンダリング
+                    const renderedHtml = renderMarkdown(item.content);
+                    aiMsg.innerHTML = renderedHtml;
                     chatMessages.appendChild(aiMsg);
+                    
+                    // MathJaxでLaTeX数式をレンダリング
+                    renderMathInElement(aiMsg);
                 }
             });
         }
@@ -1023,6 +1239,7 @@
 
             // AI response
             const aiMsg = document.createElement('div');
+            aiMsg.className = 'markdown-content';
             Object.assign(aiMsg.style, {
                 background: '#ffffff',
                 padding: '12px 16px',
@@ -1218,6 +1435,7 @@
 
         // AIレスポンス用の要素を作成
         const aiMsg = document.createElement('div');
+        aiMsg.className = 'markdown-content';
         Object.assign(aiMsg.style, {
             background: '#ffffff',
             padding: '12px 16px',
@@ -1263,7 +1481,13 @@
 
                 const chunk = decoder.decode(value, { stream: true });
                 aiResponse += chunk;
-                aiMsg.textContent += chunk;
+                
+                // リアルタイムでMarkdownレンダリング
+                const renderedHtml = renderMarkdown(aiResponse);
+                aiMsg.innerHTML = renderedHtml;
+                
+                // MathJaxでLaTeX数式をレンダリング
+                renderMathInElement(aiMsg);
                 chatMessages.scrollTop = chatMessages.scrollHeight;
             }
 
@@ -1321,7 +1545,13 @@
 
                 const chunk = decoder.decode(value, { stream: true });
                 aiResponse += chunk;
-                responseElement.textContent += chunk;
+                
+                // リアルタイムでMarkdownレンダリング
+                const renderedHtml = renderMarkdown(aiResponse);
+                responseElement.innerHTML = renderedHtml;
+                
+                // MathJaxでLaTeX数式をレンダリング
+                renderMathInElement(responseElement);
                 
                 // チャットメッセージエリアを下にスクロール
                 const chatMessages = document.getElementById('chat-messages');
@@ -1405,6 +1635,7 @@
 
         // AIレスポンス用の要素を作成
         const aiMsg = document.createElement('div');
+        aiMsg.className = 'markdown-content';
         Object.assign(aiMsg.style, {
             background: '#ffffff',
             padding: '12px 16px',
@@ -1450,7 +1681,13 @@
 
                 const chunk = decoder.decode(value, { stream: true });
                 aiResponse += chunk;
-                aiMsg.textContent += chunk;
+                
+                // リアルタイムでMarkdownレンダリング
+                const renderedHtml = renderMarkdown(aiResponse);
+                aiMsg.innerHTML = renderedHtml;
+                
+                // MathJaxでLaTeX数式をレンダリング
+                renderMathInElement(aiMsg);
                 chatMessages.scrollTop = chatMessages.scrollHeight;
             }
 
