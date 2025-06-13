@@ -1,5 +1,5 @@
 {
-  "name": "interstellar",
+  "name": "aibrowser",
   "version": "5.2.5",
   "type": "module",
   "engines": {
@@ -12,7 +12,7 @@
     "precommit": "pnpm run format && biome check --write .",
     "lint": "biome lint --write ."
   },
-  "author": "InterstellarNetwork",
+  "author": "choko",
   "license": "GPL-3.0-or-later",
   "dependencies": {
     "@google/generative-ai": "^0.24.1",

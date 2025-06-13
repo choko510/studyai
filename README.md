@@ -46,7 +46,7 @@ AIBrowserは、Google Gemini AIを統合した次世代ブラウザプロキシ�
 
 1. **リポジトリのクローン**
 ```bash
-git clone https://github.com/your-username/AIBrowser.git
+git clone https://github.com/choko510/AIBrowser.git
 cd AIBrowser
 ```
 
