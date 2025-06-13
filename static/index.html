@@ -43,8 +43,7 @@
   <link href="https://cdn.jsdelivr.net/npm/winbox@0.2.82/dist/css/winbox.min.css" rel="stylesheet">
   <script src="https://cdn.jsdelivr.net/npm/marked@15.0.12/marked.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/dompurify@3.0.5/dist/purify.min.js"></script>
-  <script src="https://polyfill.io/v3/polyfill.min.js?features=es6"></script>
-  <script id="MathJax-script" async src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script>
+  <script id="MathJax-script" async src="https://cdn.jsdelivr.net/npm/mathjax@3.2.2/es5/tex-mml-chtml.js"></script>
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
 
   <script>
@@ -260,6 +259,36 @@
                 ctx.beginPath();
                 ctx.moveTo(e.clientX, e.clientY);
             }
+        });
+
+        // タッチデバイス対応
+        doc.addEventListener('touchstart', (e) => {
+            e.preventDefault();
+            const touch = e.touches[0];
+            const mouseEvent = new MouseEvent('mousedown', {
+                clientX: touch.clientX,
+                clientY: touch.clientY,
+                button: 2
+            });
+            doc.dispatchEvent(mouseEvent);
+        });
+
+        doc.addEventListener('touchend', (e) => {
+            e.preventDefault();
+            const mouseEvent = new MouseEvent('mouseup', {
+                button: 2
+            });
+            doc.dispatchEvent(mouseEvent);
+        });
+
+        doc.addEventListener('touchmove', (e) => {
+            e.preventDefault();
+            const touch = e.touches[0];
+            const mouseEvent = new MouseEvent('mousemove', {
+                clientX: touch.clientX,
+                clientY: touch.clientY
+            });
+            doc.dispatchEvent(mouseEvent);
         });
     }
 
@@ -525,8 +554,20 @@
         }
         const avgSegmentLength = totalDistance / (path.length - 1);
         
-        // 動的閾値を計算
-        const dynamicThreshold = Math.max(25, Math.min(80, avgSegmentLength * 2.5));
+        // バウンディングボックスによる動的閾値計算
+        const boundingBox = getBoundingBox(path);
+        const diagonalLength = Math.sqrt(boundingBox.width * boundingBox.width + boundingBox.height * boundingBox.height);
+        const sizeBasedThreshold = diagonalLength * 0.1; // 対角線の10%
+        
+        // 複数の基準による動的閾値を計算
+        const dynamicThreshold = Math.max(
+            20, // 最小閾値
+            Math.min(
+                120, // 最大閾値
+                avgSegmentLength * 2.5,
+                sizeBasedThreshold
+            )
+        );
         
         // 方法1: 直接距離チェック
         if (directDistance < dynamicThreshold) {
@@ -538,14 +579,14 @@
         }
         
         // 方法2: 終点から開始点に向かう複数点チェック
-        const lastFewPoints = Math.min(5, Math.floor(path.length * 0.1));
+        const lastFewPoints = Math.min(8, Math.floor(path.length * 0.15));
         for (let i = 1; i <= lastFewPoints; i++) {
             const checkPoint = path[path.length - 1 - i];
             const checkDistance = Math.sqrt(
                 Math.pow(startPoint.x - checkPoint.x, 2) +
                 Math.pow(startPoint.y - checkPoint.y, 2)
             );
-            if (checkDistance < dynamicThreshold * 1.2) {
+            if (checkDistance < dynamicThreshold * 1.3) {
                 return {
                     isClosed: true,
                     method: '複数点チェック',
@@ -555,8 +596,8 @@
         }
         
         // 方法3: 開始点周辺の範囲チェック
-        const startAreaRadius = dynamicThreshold * 1.5;
-        const endPointsInStartArea = path.slice(-Math.min(10, Math.floor(path.length * 0.2)))
+        const startAreaRadius = dynamicThreshold * 1.8;
+        const endPointsInStartArea = path.slice(-Math.min(15, Math.floor(path.length * 0.25)))
             .filter(point => {
                 const dist = Math.sqrt(
                     Math.pow(startPoint.x - point.x, 2) +
@@ -569,20 +610,46 @@
             return {
                 isClosed: true,
                 method: '範囲チェック',
-                details: `開始点周辺に${endPointsInStartArea.length}点検出`
+                details: `開始点周辺(${startAreaRadius.toFixed(1)}px)に${endPointsInStartArea.length}点検出`
             };
         }
         
-        // 方法4: 図形の面積に基づく判定（円形らしさ）
+        // 方法4: 中間点による近似チェック（描画速度が速い場合の対応）
         if (path.length >= 10) {
-            const boundingBox = getBoundingBox(path);
+            const quarterPoint = Math.floor(path.length * 0.25);
+            const halfPoint = Math.floor(path.length * 0.5);
+            const threeQuarterPoint = Math.floor(path.length * 0.75);
+            
+            // 開始点から各分割点までの平均距離を計算
+            const distances = [quarterPoint, halfPoint, threeQuarterPoint].map(index => {
+                return Math.sqrt(
+                    Math.pow(startPoint.x - path[index].x, 2) +
+                    Math.pow(startPoint.y - path[index].y, 2)
+                );
+            });
+            
+            const avgDistanceFromStart = distances.reduce((a, b) => a + b, 0) / distances.length;
+            
+            // 終点が開始点から他の点と同程度の距離にある場合は閉じた図形の可能性
+            if (directDistance < avgDistanceFromStart * 0.5 && directDistance < dynamicThreshold * 2) {
+                return {
+                    isClosed: true,
+                    method: '中間点分析',
+                    details: `終点距離: ${directDistance.toFixed(1)}px, 平均距離: ${avgDistanceFromStart.toFixed(1)}px`
+                };
+            }
+        }
+        
+        // 方法5: 図形の面積に基づく判定（円形らしさ）
+        if (path.length >= 10) {
             const area = boundingBox.width * boundingBox.height;
             const perimeter = totalDistance;
             
             // 円形度を計算（完全な円なら1に近い）
             const circularity = (4 * Math.PI * area) / (perimeter * perimeter);
             
-            if (circularity > 0.3 && directDistance < dynamicThreshold * 2) {
+            // より緩い条件で円形らしさをチェック
+            if (circularity > 0.2 && directDistance < dynamicThreshold * 2.5) {
                 return {
                     isClosed: true,
                     method: '形状分析',
@@ -594,7 +661,7 @@
         return {
             isClosed: false,
             method: 'none',
-            details: `直接距離: ${directDistance.toFixed(1)}px > 閾値: ${dynamicThreshold.toFixed(1)}px`
+            details: `直接距離: ${directDistance.toFixed(1)}px > 閾値: ${dynamicThreshold.toFixed(1)}px, パス長: ${path.length}`
         };
     }
     
@@ -621,10 +688,10 @@
             
             // 少し待ってから送信
             setTimeout(() => {
-                sendScreenshotToAI(imageBlob, 'マーカーで囲んだ範囲について説明してください');
+                sendScreenshotToAI(imageBlob, '赤いマーカーで囲んだ範囲について解説や説明を行ってください');
             }, 500);
         } else {
-            sendScreenshotToAI(imageBlob, 'マーカーで囲んだ範囲について説明してください');
+            sendScreenshotToAI(imageBlob, '赤いマーカーで囲んだ範囲について解説や説明を行ってください');
         }
     }
 
