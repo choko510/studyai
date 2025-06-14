@@ -20,7 +20,7 @@
         <button class="nav-btn" id="forward-btn" onclick="goForward()" disabled>→</button>
         <button class="nav-btn" id="refresh-btn" onclick="refresh()">⟲</button>
         <button class="nav-btn" id="ai-btn" onclick="openAIWithScreenshot()">AI質問</button>
-        <button class="nav-btn" id="multimodal-btn" onclick="openMultimodalLive()">🎥 マルチモーダルAI</button>
+        <button class="nav-btn" id="voice-ai-btn" onclick="openVoiceAI()">音声AI</button>
       </div>
       <input type="text" class="url-input" id="url-input" placeholder="URLまたは検索語句を入力..." value="https://google.com">
       <button class="go-btn" onclick="navigate()">移動</button>
@@ -87,636 +87,6 @@
           console.error('Service Worker registration failed:', error);
         });
       });
-    }
-
-    // Multimodal Live APIを開く関数
-    function openMultimodalLive() {
-        createMultimodalLiveChat();
-    }
-
-    // Multimodal Live Chat を WinBox で作成
-    function createMultimodalLiveChat() {
-        const winbox = new WinBox({
-            title: "🎥 Multimodal Live AI",
-            width: 600,
-            height: 700,
-            x: "center",
-            y: "center",
-            background: "linear-gradient(135deg, #667eea 0%, #764ba2 100%)"
-        });
-
-        // コンテナ作成
-        const container = document.createElement('div');
-        container.id = 'multimodal-live-container';
-        Object.assign(container.style, {
-            display: 'flex',
-            flexDirection: 'column',
-            height: '100%',
-            fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
-            background: 'linear-gradient(135deg, #f8fafc 0%, #e2e8f0 100%)',
-            color: '#1a1a1a'
-        });
-
-        // ヘッダー
-        const header = document.createElement('div');
-        Object.assign(header.style, {
-            padding: '15px 20px',
-            background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
-            color: 'white',
-            textAlign: 'center',
-            borderRadius: '0 0 15px 15px',
-            marginBottom: '15px',
-            boxShadow: '0 4px 15px rgba(0,0,0,0.1)'
-        });
-        header.innerHTML = `
-            <h3 style="margin: 0 0 8px 0; font-size: 18px; font-weight: 600;">
-                <i class="fas fa-video" style="margin-right: 8px;"></i>
-                Multimodal Live AI
-            </h3>
-            <p style="margin: 0; opacity: 0.9; font-size: 12px;">
-                画面共有とマイクでリアルタイムAI対話
-            </p>
-        `;
-
-        // ビデオエリア
-        const videoContainer = document.createElement('div');
-        Object.assign(videoContainer.style, {
-            position: 'relative',
-            width: '100%',
-            height: '200px',
-            background: '#f8f9fa',
-            borderRadius: '12px',
-            margin: '0 15px 15px 15px',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            border: '2px dashed #dee2e6',
-            overflow: 'hidden'
-        });
-
-        const video = document.createElement('video');
-        video.id = 'multimodal-video';
-        video.autoplay = true;
-        video.muted = true;
-        video.playsInline = true;
-        Object.assign(video.style, {
-            width: '100%',
-            height: '100%',
-            objectFit: 'cover',
-            borderRadius: '12px',
-            display: 'none'
-        });
-
-        const placeholder = document.createElement('div');
-        placeholder.id = 'video-placeholder';
-        placeholder.innerHTML = `
-            <div style="text-align: center; color: #6c757d;">
-                <div style="font-size: 2rem; margin-bottom: 8px;">🖥️</div>
-                <div style="font-size: 14px;">画面共有を開始してください</div>
-            </div>
-        `;
-
-        const recordingIndicator = document.createElement('div');
-        recordingIndicator.id = 'recording-indicator';
-        recordingIndicator.innerHTML = '<span>🔴</span> 録画中';
-        Object.assign(recordingIndicator.style, {
-            position: 'absolute',
-            top: '10px',
-            right: '10px',
-            background: '#dc3545',
-            color: 'white',
-            padding: '4px 10px',
-            borderRadius: '12px',
-            fontSize: '11px',
-            fontWeight: '600',
-            display: 'none'
-        });
-
-        videoContainer.appendChild(video);
-        videoContainer.appendChild(placeholder);
-        videoContainer.appendChild(recordingIndicator);
-
-        // コントロールボタン
-        const controls = document.createElement('div');
-        Object.assign(controls.style, {
-            display: 'flex',
-            gap: '10px',
-            justifyContent: 'center',
-            padding: '0 15px 15px 15px',
-            flexWrap: 'wrap'
-        });
-
-        const createBtn = (text, icon, primary = false) => {
-            const btn = document.createElement('button');
-            btn.innerHTML = `<i class="${icon}"></i> ${text}`;
-            Object.assign(btn.style, {
-                padding: '8px 16px',
-                border: 'none',
-                borderRadius: '20px',
-                cursor: 'pointer',
-                fontSize: '12px',
-                fontWeight: '500',
-                transition: 'all 0.2s ease',
-                background: primary ? '#667eea' : '#6c757d',
-                color: 'white'
-            });
-            return btn;
-        };
-
-        const startCameraBtn = createBtn('画面共有', 'fas fa-desktop', true);
-        const stopCameraBtn = createBtn('共有停止', 'fas fa-stop');
-        const startSessionBtn = createBtn('セッション開始', 'fas fa-play', true);
-        const stopSessionBtn = createBtn('セッション停止', 'fas fa-pause');
-
-        stopCameraBtn.disabled = true;
-        startSessionBtn.disabled = true;
-        stopSessionBtn.disabled = true;
-
-        controls.appendChild(startCameraBtn);
-        controls.appendChild(stopCameraBtn);
-        controls.appendChild(startSessionBtn);
-        controls.appendChild(stopSessionBtn);
-
-        // チャットエリア
-        const chatContainer = document.createElement('div');
-        Object.assign(chatContainer.style, {
-            flex: '1',
-            margin: '0 15px',
-            background: 'white',
-            borderRadius: '12px',
-            display: 'flex',
-            flexDirection: 'column',
-            boxShadow: '0 2px 10px rgba(0,0,0,0.1)',
-            overflow: 'hidden'
-        });
-
-        const chatMessages = document.createElement('div');
-        chatMessages.id = 'multimodal-chat-messages';
-        Object.assign(chatMessages.style, {
-            flex: '1',
-            padding: '15px',
-            overflowY: 'auto',
-            display: 'flex',
-            flexDirection: 'column',
-            gap: '10px',
-            maxHeight: '200px'
-        });
-
-        const welcomeMsg = document.createElement('div');
-        Object.assign(welcomeMsg.style, {
-            background: '#f8f9fa',
-            padding: '10px 12px',
-            borderRadius: '12px',
-            fontSize: '12px',
-            color: '#6c757d',
-            textAlign: 'center',
-            border: '1px solid #e9ecef'
-        });
-        welcomeMsg.innerHTML = '<i class="fas fa-info-circle"></i> セッションを開始すると、リアルタイムAI対話が始まります';
-        chatMessages.appendChild(welcomeMsg);
-
-        // 入力エリア
-        const inputArea = document.createElement('div');
-        Object.assign(inputArea.style, {
-            padding: '12px 15px',
-            borderTop: '1px solid #e9ecef',
-            background: '#f8f9fa'
-        });
-
-        const inputContainer = document.createElement('div');
-        Object.assign(inputContainer.style, {
-            display: 'flex',
-            gap: '8px',
-            alignItems: 'center'
-        });
-
-        const textInput = document.createElement('input');
-        textInput.type = 'text';
-        textInput.placeholder = 'テキストメッセージ...';
-        textInput.disabled = true;
-        Object.assign(textInput.style, {
-            flex: '1',
-            padding: '8px 12px',
-            border: '1px solid #dee2e6',
-            borderRadius: '15px',
-            fontSize: '12px',
-            outline: 'none'
-        });
-
-        const sendBtn = createBtn('送信', 'fas fa-paper-plane', true);
-        sendBtn.disabled = true;
-
-        inputContainer.appendChild(textInput);
-        inputContainer.appendChild(sendBtn);
-        inputArea.appendChild(inputContainer);
-
-        chatContainer.appendChild(chatMessages);
-        chatContainer.appendChild(inputArea);
-
-        // ステータス表示
-        const statusContainer = document.createElement('div');
-        Object.assign(statusContainer.style, {
-            display: 'flex',
-            gap: '10px',
-            justifyContent: 'center',
-            padding: '10px 15px 15px 15px'
-        });
-
-        const createStatus = (label) => {
-            const status = document.createElement('div');
-            Object.assign(status.style, {
-                display: 'flex',
-                alignItems: 'center',
-                gap: '6px',
-                padding: '6px 12px',
-                background: 'white',
-                borderRadius: '15px',
-                fontSize: '11px',
-                fontWeight: '500',
-                boxShadow: '0 1px 5px rgba(0,0,0,0.1)'
-            });
-            
-            const dot = document.createElement('div');
-            Object.assign(dot.style, {
-                width: '8px',
-                height: '8px',
-                borderRadius: '50%',
-                background: '#dc3545'
-            });
-            
-            const text = document.createElement('span');
-            text.textContent = label;
-            
-            status.appendChild(dot);
-            status.appendChild(text);
-            status.dot = dot;
-            status.text = text;
-            return status;
-        };
-
-        const connectionStatus = createStatus('未接続');
-        const audioStatus = createStatus('音声待機');
-        const videoStatus = createStatus('映像待機');
-
-        statusContainer.appendChild(connectionStatus);
-        statusContainer.appendChild(audioStatus);
-        statusContainer.appendChild(videoStatus);
-
-        // コンテナに追加
-        container.appendChild(header);
-        container.appendChild(videoContainer);
-        container.appendChild(controls);
-        container.appendChild(chatContainer);
-        container.appendChild(statusContainer);
-
-        winbox.body.appendChild(container);
-
-        // Multimodal Live クライアント変数
-        let multimodalClient = null;
-        let mediaStream = null;
-        let ws = null;
-        let isSessionActive = false;
-
-        // ステータス更新関数
-        const updateStatus = (statusElement, state, text) => {
-            const colors = {
-                disconnected: '#dc3545',
-                connecting: '#ffc107',
-                connected: '#28a745',
-                active: '#28a745',
-                inactive: '#dc3545',
-                error: '#dc3545'
-            };
-            statusElement.dot.style.background = colors[state] || '#dc3545';
-            statusElement.text.textContent = text;
-        };
-
-        // 画面キャプチャ開始
-        startCameraBtn.addEventListener('click', async () => {
-            try {
-                updateStatus(videoStatus, 'connecting', '接続中...');
-                
-                // 画面キャプチャとマイクの組み合わせ
-                const displayStream = await navigator.mediaDevices.getDisplayMedia({
-                    video: {
-                        width: 1920,
-                        height: 1080,
-                        frameRate: 15
-                    },
-                    audio: false
-                });
-                
-                const audioStream = await navigator.mediaDevices.getUserMedia({
-                    audio: {
-                        sampleRate: 16000,
-                        channelCount: 1,
-                        echoCancellation: true,
-                        noiseSuppression: true
-                    }
-                });
-                
-                // 画面とマイク音声を組み合わせ
-                mediaStream = new MediaStream([
-                    ...displayStream.getVideoTracks(),
-                    ...audioStream.getAudioTracks()
-                ]);
-                
-                video.srcObject = displayStream;
-                video.style.display = 'block';
-                placeholder.style.display = 'none';
-                
-                updateStatus(videoStatus, 'active', '画面共有中');
-                updateStatus(audioStatus, 'active', '音声有効');
-                
-                startCameraBtn.disabled = true;
-                stopCameraBtn.disabled = false;
-                startSessionBtn.disabled = false;
-                
-                // 画面共有が終了した時の処理
-                displayStream.getVideoTracks()[0].addEventListener('ended', () => {
-                    addMessage('system', '画面共有が終了しました');
-                    if (mediaStream) {
-                        mediaStream.getTracks().forEach(track => track.stop());
-                        mediaStream = null;
-                    }
-                    video.style.display = 'none';
-                    placeholder.style.display = 'block';
-                    updateStatus(videoStatus, 'inactive', '映像待機');
-                    updateStatus(audioStatus, 'inactive', '音声待機');
-                    startCameraBtn.disabled = false;
-                    stopCameraBtn.disabled = true;
-                    startSessionBtn.disabled = true;
-                    if (isSessionActive) {
-                        stopSession();
-                    }
-                });
-                
-                addMessage('system', '画面共有とマイクが有効になりました');
-                
-            } catch (error) {
-                console.error('画面キャプチャエラー:', error);
-                updateStatus(videoStatus, 'error', 'キャプチャエラー');
-                updateStatus(audioStatus, 'error', 'マイクエラー');
-                addMessage('system', `エラー: ${error.message}`);
-            }
-        });
-
-        // 画面共有停止
-        stopCameraBtn.addEventListener('click', () => {
-            if (mediaStream) {
-                mediaStream.getTracks().forEach(track => track.stop());
-                mediaStream = null;
-            }
-            
-            video.style.display = 'none';
-            placeholder.style.display = 'block';
-            recordingIndicator.style.display = 'none';
-            
-            updateStatus(videoStatus, 'inactive', '映像待機');
-            updateStatus(audioStatus, 'inactive', '音声待機');
-            
-            startCameraBtn.disabled = false;
-            stopCameraBtn.disabled = true;
-            startSessionBtn.disabled = true;
-            
-            if (isSessionActive) {
-                stopSession();
-            }
-            
-            addMessage('system', '画面共有とマイクを停止しました');
-        });
-
-        // セッション開始
-        startSessionBtn.addEventListener('click', async () => {
-            try {
-                updateStatus(connectionStatus, 'connecting', '接続中...');
-                addMessage('system', 'AI接続中...');
-                
-                ws = new WebSocket(`ws://${window.location.host}/ws/multimodal-live`);
-                
-                ws.onopen = () => {
-                    isSessionActive = true;
-                    updateStatus(connectionStatus, 'connected', '接続済み');
-                    addMessage('system', '✅ AIセッション開始！');
-                    
-                    startSessionBtn.disabled = true;
-                    stopSessionBtn.disabled = false;
-                    textInput.disabled = false;
-                    sendBtn.disabled = false;
-                    recordingIndicator.style.display = 'block';
-                    
-                    startStreaming();
-                };
-                
-                ws.onmessage = (event) => {
-                    const data = JSON.parse(event.data);
-                    handleServerMessage(data);
-                };
-                
-                ws.onclose = () => {
-                    isSessionActive = false;
-                    updateStatus(connectionStatus, 'disconnected', '未接続');
-                    addMessage('system', '❌ セッション終了');
-                    
-                    startSessionBtn.disabled = false;
-                    stopSessionBtn.disabled = true;
-                    textInput.disabled = true;
-                    sendBtn.disabled = true;
-                    recordingIndicator.style.display = 'none';
-                };
-                
-                ws.onerror = (error) => {
-                    console.error('WebSocket error:', error);
-                    updateStatus(connectionStatus, 'error', '接続エラー');
-                    addMessage('system', '❌ 接続エラー');
-                };
-                
-            } catch (error) {
-                console.error('セッション開始エラー:', error);
-                updateStatus(connectionStatus, 'error', '接続エラー');
-                addMessage('system', `エラー: ${error.message}`);
-            }
-        });
-
-        // セッション停止
-        const stopSession = () => {
-            if (ws) {
-                ws.close();
-                ws = null;
-            }
-            isSessionActive = false;
-            recordingIndicator.style.display = 'none';
-            addMessage('system', 'セッションを停止しました');
-        };
-
-        stopSessionBtn.addEventListener('click', stopSession);
-
-        // メッセージ送信
-        const sendMessage = () => {
-            const text = textInput.value.trim();
-            if (!text || !isSessionActive) return;
-            
-            ws.send(JSON.stringify({
-                type: 'text',
-                content: text,
-                timestamp: Date.now()
-            }));
-            
-            addMessage('user', text);
-            textInput.value = '';
-        };
-
-        sendBtn.addEventListener('click', sendMessage);
-        textInput.addEventListener('keypress', (e) => {
-            if (e.key === 'Enter') sendMessage();
-        });
-
-        // メッセージ追加
-        const addMessage = (type, content, isPartial = false) => {
-            if (type === 'ai' && isPartial) {
-                // 既存のAIメッセージを更新
-                const lastMsg = chatMessages.lastElementChild;
-                if (lastMsg && lastMsg.classList.contains('ai-message')) {
-                    lastMsg.innerHTML = `
-                        <div style="font-size: 11px; color: #6c757d; margin-bottom: 4px;">
-                            <i class="fas fa-robot"></i> AI
-                        </div>
-                        ${renderMarkdown(content)}
-                    `;
-                    renderMathInElement(lastMsg);
-                    chatMessages.scrollTop = chatMessages.scrollHeight;
-                    return;
-                }
-            }
-            
-            const msgDiv = document.createElement('div');
-            msgDiv.className = `${type}-message`;
-            
-            const styles = {
-                user: { background: '#667eea', color: 'white', alignSelf: 'flex-end' },
-                ai: { background: '#f8f9fa', color: '#333', alignSelf: 'flex-start' },
-                system: { background: '#fff3cd', color: '#856404', alignSelf: 'center', textAlign: 'center' }
-            };
-            
-            Object.assign(msgDiv.style, {
-                padding: '8px 12px',
-                borderRadius: '12px',
-                maxWidth: '85%',
-                fontSize: '12px',
-                lineHeight: '1.4',
-                wordWrap: 'break-word',
-                ...styles[type]
-            });
-            
-            if (type === 'user') {
-                msgDiv.innerHTML = `
-                    <div style="font-size: 11px; opacity: 0.8; margin-bottom: 4px;">あなた</div>
-                    ${content}
-                `;
-            } else if (type === 'ai') {
-                msgDiv.innerHTML = `
-                    <div style="font-size: 11px; color: #6c757d; margin-bottom: 4px;">
-                        <i class="fas fa-robot"></i> AI
-                    </div>
-                    ${renderMarkdown(content)}
-                `;
-            } else {
-                msgDiv.innerHTML = `<i class="fas fa-info-circle"></i> ${content}`;
-            }
-            
-            chatMessages.appendChild(msgDiv);
-            chatMessages.scrollTop = chatMessages.scrollHeight;
-            
-            if (type === 'ai') {
-                renderMathInElement(msgDiv);
-            }
-        };
-
-        // サーバーメッセージ処理
-        const handleServerMessage = (data) => {
-            switch (data.type) {
-                case 'ai_response':
-                    if (data.isPartial) {
-                        addMessage('ai', data.content, true);
-                    } else if (data.isComplete) {
-                        // 完了処理
-                    } else {
-                        addMessage('ai', data.content);
-                    }
-                    break;
-                case 'transcription':
-                    addMessage('user', `🎤 ${data.content}`);
-                    break;
-                case 'system':
-                    addMessage('system', data.content);
-                    break;
-                case 'error':
-                    addMessage('system', `❌ ${data.content}`);
-                    break;
-            }
-        };
-
-        // ストリーミング開始
-        let currentAIResponse = '';
-        const startStreaming = () => {
-            if (!mediaStream || !isSessionActive) return;
-            
-            // 音声ストリーミング（簡略化）
-            const audioContext = new (window.AudioContext || window.webkitAudioContext)();
-            const source = audioContext.createMediaStreamSource(mediaStream);
-            const processor = audioContext.createScriptProcessor(4096, 1, 1);
-            
-            processor.onaudioprocess = (event) => {
-                if (isSessionActive && ws.readyState === WebSocket.OPEN) {
-                    const audioData = event.inputBuffer.getChannelData(0);
-                    const int16Array = new Int16Array(audioData.length);
-                    for (let i = 0; i < audioData.length; i++) {
-                        int16Array[i] = audioData[i] * 0x7FFF;
-                    }
-                    
-                    ws.send(JSON.stringify({
-                        type: 'audio',
-                        data: Array.from(int16Array),
-                        timestamp: Date.now()
-                    }));
-                }
-            };
-            
-            source.connect(processor);
-            processor.connect(audioContext.destination);
-            
-            // 映像ストリーミング（定期送信）
-            const sendVideoFrame = () => {
-                if (!isSessionActive || !video.videoWidth) return;
-                
-                const canvas = document.createElement('canvas');
-                canvas.width = 320;
-                canvas.height = 240;
-                const ctx = canvas.getContext('2d');
-                ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
-                
-                canvas.toBlob((blob) => {
-                    if (blob && isSessionActive && ws.readyState === WebSocket.OPEN) {
-                        const reader = new FileReader();
-                        reader.onload = () => {
-                            const base64 = reader.result.split(',')[1];
-                            ws.send(JSON.stringify({
-                                type: 'video',
-                                data: base64,
-                                timestamp: Date.now()
-                            }));
-                        };
-                        reader.readAsDataURL(blob);
-                    }
-                }, 'image/jpeg', 0.7);
-                
-                if (isSessionActive) {
-                    setTimeout(sendVideoFrame, 2000); // 2秒間隔
-                }
-            };
-            
-            sendVideoFrame();
-        };
     }
 
     // iOS検出関数
@@ -804,22 +174,585 @@
         });
     }
 
+    function setupRightClickPaint(doc) {
+        const canvas = doc.createElement('canvas');
+        canvas.style.position = 'fixed';
+        canvas.style.top = '0';
+        canvas.style.left = '0';
+        canvas.style.pointerEvents = 'none';
+        canvas.width = doc.documentElement.clientWidth;
+        canvas.height = doc.documentElement.clientHeight;
+        canvas.style.zIndex = 9999;
+        doc.body.appendChild(canvas);
+
+        const ctx = canvas.getContext('2d');
+        const paintColor = 'red';
+        const brushSize = 3;
+        let isPainting = false;
+        let lastX = 0;
+        let lastY = 0;
+        let currentPath = []; // 現在描画中のパス
+        let completedPaths = []; // 完成したパス
+
+        // ペイント設定
+        ctx.strokeStyle = paintColor;
+        ctx.lineWidth = brushSize;
+        ctx.lineCap = 'round';
+        ctx.lineJoin = 'round';
+
+        doc.addEventListener('contextmenu', (e) => e.preventDefault());
+
+        doc.addEventListener('mousedown', (e) => {
+            if (e.button === 2) {
+                isPainting = true;
+                canvas.style.pointerEvents = 'auto';
+                [lastX, lastY] = [e.clientX, e.clientY];
+                
+                // 新しいパスを開始
+                currentPath = [{x: lastX, y: lastY}];
+                ctx.beginPath();
+                ctx.moveTo(lastX, lastY);
+            }
+        });
+
+        doc.addEventListener('mouseup', (e) => {
+            if (e.button === 2) {
+                isPainting = false;
+                canvas.style.pointerEvents = 'none';
+                
+                // パスが閉じているかチェック（複数の方法で判定）
+                if (currentPath.length > 5) { // 最低限の長さを緩和
+                    const isClosedShape = checkIfShapeIsClosed(currentPath);
+                    
+                    console.log('マーカー検出:', {
+                        pathLength: currentPath.length,
+                        isClosed: isClosedShape.isClosed,
+                        method: isClosedShape.method,
+                        details: isClosedShape.details
+                    });
+                    
+                    if (isClosedShape.isClosed) {
+                        // 閉じた図形として処理
+                        ctx.closePath();
+                        completedPaths.push([...currentPath]);
+                        
+                        console.log('マーカー範囲が検出されました！検出方法:', isClosedShape.method);
+                        // AIに送信するか確認
+                        showMarkerConfirmDialog(doc, currentPath, canvas, ctx);
+                    } else {
+                        console.log('マーカー範囲が検出されませんでした。理由:', isClosedShape.details);
+                    }
+                } else {
+                    console.log('パスが短すぎます。長さ:', currentPath.length);
+                }
+                
+                currentPath = [];
+                ctx.beginPath(); // パスをリセット
+            }
+        });
+
+        doc.addEventListener('mousemove', (e) => {
+            if (isPainting) {
+                currentPath.push({x: e.clientX, y: e.clientY});
+                ctx.lineTo(e.clientX, e.clientY);
+                ctx.stroke();
+                ctx.beginPath();
+                ctx.moveTo(e.clientX, e.clientY);
+            }
+        });
+
+        // タッチデバイス対応
+        doc.addEventListener('touchstart', (e) => {
+            e.preventDefault();
+            const touch = e.touches[0];
+            const mouseEvent = new MouseEvent('mousedown', {
+                clientX: touch.clientX,
+                clientY: touch.clientY,
+                button: 2
+            });
+            doc.dispatchEvent(mouseEvent);
+        });
+
+        doc.addEventListener('touchend', (e) => {
+            e.preventDefault();
+            const mouseEvent = new MouseEvent('mouseup', {
+                button: 2
+            });
+            doc.dispatchEvent(mouseEvent);
+        });
+
+        doc.addEventListener('touchmove', (e) => {
+            e.preventDefault();
+            const touch = e.touches[0];
+            const mouseEvent = new MouseEvent('mousemove', {
+                clientX: touch.clientX,
+                clientY: touch.clientY
+            });
+            doc.dispatchEvent(mouseEvent);
+        });
+    }
+
+    // マーカー範囲確認ダイアログを表示
+    function showMarkerConfirmDialog(doc, markerPath, canvas, ctx) {
+        // 既存のダイアログがあれば削除
+        const existingDialog = doc.getElementById('marker-confirm-dialog');
+        if (existingDialog) {
+            existingDialog.remove();
+        }
+
+        // 確認ダイアログを作成
+        const dialog = doc.createElement('div');
+        dialog.id = 'marker-confirm-dialog';
+        Object.assign(dialog.style, {
+            position: 'fixed',
+            top: '50%',
+            left: '50%',
+            transform: 'translate(-50%, -50%)',
+            background: 'white',
+            borderRadius: '12px',
+            padding: '24px',
+            boxShadow: '0 10px 40px rgba(0,0,0,0.3)',
+            zIndex: 10000,
+            fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
+            color: '#1a1a1a',
+            minWidth: '300px',
+            textAlign: 'center'
+        });
+
+        dialog.innerHTML = `
+            <h3 style="margin: 0 0 16px 0; font-size: 18px; color: #374151;">マーカー範囲を検出</h3>
+            <p style="margin: 0 0 24px 0; font-size: 14px; color: #6b7280; line-height: 1.5;">
+                この範囲をAIに送信して分析しますか？
+            </p>
+            <div style="display: flex; gap: 12px; justify-content: center;">
+                <button id="confirm-yes" style="
+                    background: #3b82f6;
+                    color: white;
+                    border: none;
+                    padding: 10px 20px;
+                    border-radius: 8px;
+                    cursor: pointer;
+                    font-size: 14px;
+                    font-weight: 500;
+                ">はい</button>
+                <button id="confirm-no" style="
+                    background: #6b7280;
+                    color: white;
+                    border: none;
+                    padding: 10px 20px;
+                    border-radius: 8px;
+                    cursor: pointer;
+                    font-size: 14px;
+                    font-weight: 500;
+                ">いいえ</button>
+            </div>
+        `;
+
+        doc.body.appendChild(dialog);
+
+        // マーカーを消去する関数
+        function clearMarker() {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+        }
+
+        // イベントリスナー
+        const yesBtn = dialog.querySelector('#confirm-yes');
+        const noBtn = dialog.querySelector('#confirm-no');
+
+        yesBtn.addEventListener('click', async () => {
+            // ダイアログを即座に非表示にしてからキャプチャ実行
+            dialog.style.display = 'none';
+            await captureMarkedArea(doc, markerPath);
+            clearMarker(); // マーカーを消去
+            dialog.remove();
+        });
+
+        noBtn.addEventListener('click', () => {
+            clearMarker(); // マーカーを消去
+            dialog.remove();
+        });
+
+        // 5秒後に自動で閉じる（マーカーも消去）- 少し長めに設定
+        setTimeout(() => {
+            if (dialog.parentNode) {
+                clearMarker();
+                dialog.remove();
+            }
+        }, 5000);
+    }
+
+    // マーカーで囲まれた範囲をキャプチャしてAIに送信
+    async function captureMarkedArea(doc, markerPath) {
+        try {
+            // 確認ダイアログを非表示にする（スクリーンショットに映り込まないように）
+            const existingDialog = doc.getElementById('marker-confirm-dialog');
+            if (existingDialog) {
+                existingDialog.style.display = 'none';
+            }
+            
+            // iOS の場合はマーカー機能を無効化
+            if (isIOS()) {
+                showIOSCaptureAlert();
+                if (existingDialog) {
+                    existingDialog.remove();
+                }
+                return;
+            }
+            
+            // WinBoxウインドウを一時的に非表示
+            const hiddenWindows = hideAllWinBoxWindows();
+            
+            // 少し待ってからキャプチャを実行（ダイアログとWinBoxが完全に非表示になるまで）
+            await new Promise(resolve => setTimeout(resolve, 150));
+
+            // マーカーパスのバウンディングボックスを計算
+            const minX = Math.min(...markerPath.map(p => p.x));
+            const maxX = Math.max(...markerPath.map(p => p.x));
+            const minY = Math.min(...markerPath.map(p => p.y));
+            const maxY = Math.max(...markerPath.map(p => p.y));
+
+            // マーカーの中心点を計算
+            const centerX = (minX + maxX) / 2;
+            const centerY = (minY + maxY) / 2;
+
+            // マーカーのサイズを計算
+            const markerWidth = maxX - minX;
+            const markerHeight = maxY - minY;
+
+            // 十分な余白を追加（マーカーサイズの50%、最低100ピクセル）
+            const paddingX = Math.max(markerWidth * 0.5, 100);
+            const paddingY = Math.max(markerHeight * 0.5, 100);
+
+            // キャプチャ範囲を中心点から計算
+            const cropWidth = markerWidth + paddingX * 2;
+            const cropHeight = markerHeight + paddingY * 2;
+            const cropX = centerX - cropWidth / 2;
+            const cropY = centerY - cropHeight / 2;
+
+            // 画面境界内に調整
+            const screenWidth = window.innerWidth;
+            const screenHeight = window.innerHeight;
+            
+            let adjustedCropX = cropX;
+            let adjustedCropY = cropY;
+            let adjustedCropWidth = cropWidth;
+            let adjustedCropHeight = cropHeight;
+
+            // 左端調整
+            if (adjustedCropX < 0) {
+                adjustedCropX = 0;
+            }
+            // 右端調整
+            if (adjustedCropX + adjustedCropWidth > screenWidth) {
+                adjustedCropX = screenWidth - adjustedCropWidth;
+                if (adjustedCropX < 0) {
+                    adjustedCropX = 0;
+                    adjustedCropWidth = screenWidth;
+                }
+            }
+            // 上端調整
+            if (adjustedCropY < 0) {
+                adjustedCropY = 0;
+            }
+            // 下端調整
+            if (adjustedCropY + adjustedCropHeight > screenHeight) {
+                adjustedCropY = screenHeight - adjustedCropHeight;
+                if (adjustedCropY < 0) {
+                    adjustedCropY = 0;
+                    adjustedCropHeight = screenHeight;
+                }
+            }
+
+            console.log('マーカー範囲:', {
+                marker: { minX, maxX, minY, maxY, centerX, centerY },
+                crop: { x: adjustedCropX, y: adjustedCropY, width: adjustedCropWidth, height: adjustedCropHeight },
+                screen: { width: screenWidth, height: screenHeight }
+            });
+
+            // スクリーンキャプチャAPIを使用
+            if (isScreenCaptureActive && screenCaptureVideo) {
+                const fullCanvas = document.createElement('canvas');
+                fullCanvas.width = screenCaptureVideo.videoWidth;
+                fullCanvas.height = screenCaptureVideo.videoHeight;
+                const fullCtx = fullCanvas.getContext('2d');
+                fullCtx.drawImage(screenCaptureVideo, 0, 0);
+                
+                // スケール比を計算
+                const scaleX = screenCaptureVideo.videoWidth / screenWidth;
+                const scaleY = screenCaptureVideo.videoHeight / screenHeight;
+                
+                // 実際のキャプチャ範囲を計算
+                const finalCropX = adjustedCropX * scaleX;
+                const finalCropY = adjustedCropY * scaleY;
+                const finalCropWidth = adjustedCropWidth * scaleX;
+                const finalCropHeight = adjustedCropHeight * scaleY;
+                
+                console.log('実際のキャプチャ範囲:', {
+                    x: finalCropX, y: finalCropY,
+                    width: finalCropWidth, height: finalCropHeight,
+                    scale: { x: scaleX, y: scaleY },
+                    videoSize: { width: screenCaptureVideo.videoWidth, height: screenCaptureVideo.videoHeight }
+                });
+                
+                const cropCanvas = document.createElement('canvas');
+                cropCanvas.width = finalCropWidth;
+                cropCanvas.height = finalCropHeight;
+                const cropCtx = cropCanvas.getContext('2d');
+                
+                cropCtx.drawImage(
+                    fullCanvas,
+                    finalCropX, finalCropY, finalCropWidth, finalCropHeight,
+                    0, 0, cropCanvas.width, cropCanvas.height
+                );
+                
+                cropCanvas.toBlob((blob) => {
+                    // キャプチャ完了後にWinBoxウインドウを再表示
+                    showWinBoxWindows(hiddenWindows);
+                    sendMarkedAreaToAI(blob);
+                });
+            } else {
+                // WinBoxウインドウを再表示
+                showWinBoxWindows(hiddenWindows);
+                alert('スクリーンキャプチャが有効ではありません。AIチャットでスクリーンキャプチャを有効にしてください。');
+            }
+            
+            // キャプチャ完了後にダイアログを削除
+            if (existingDialog) {
+                existingDialog.remove();
+            }
+        } catch (error) {
+            console.error('マーカー範囲キャプチャエラー:', error);
+            // エラーが発生した場合もWinBoxウインドウを再表示
+            if (typeof hiddenWindows !== 'undefined') {
+                showWinBoxWindows(hiddenWindows);
+            }
+            alert('範囲のキャプチャに失敗しました。');
+        }
+    }
+
+    // 形状が閉じているかを複数の方法で判定する関数
+    function checkIfShapeIsClosed(path) {
+        if (path.length < 5) {
+            return { isClosed: false, method: 'none', details: 'パスが短すぎます' };
+        }
+
+        const startPoint = path[0];
+        const endPoint = path[path.length - 1];
+        
+        // 方法1: 直接距離による判定
+        const directDistance = Math.sqrt(
+            Math.pow(startPoint.x - endPoint.x, 2) +
+            Math.pow(startPoint.y - endPoint.y, 2)
+        );
+        
+        // パスの平均セグメント長を計算
+        let totalDistance = 0;
+        for (let i = 1; i < path.length; i++) {
+            const dx = path[i].x - path[i-1].x;
+            const dy = path[i].y - path[i-1].y;
+            totalDistance += Math.sqrt(dx * dx + dy * dy);
+        }
+        const avgSegmentLength = totalDistance / (path.length - 1);
+        
+        // バウンディングボックスによる動的閾値計算
+        const boundingBox = getBoundingBox(path);
+        const diagonalLength = Math.sqrt(boundingBox.width * boundingBox.width + boundingBox.height * boundingBox.height);
+        const sizeBasedThreshold = diagonalLength * 0.1; // 対角線の10%
+        
+        // 複数の基準による動的閾値を計算
+        const dynamicThreshold = Math.max(
+            20, // 最小閾値
+            Math.min(
+                120, // 最大閾値
+                avgSegmentLength * 2.5,
+                sizeBasedThreshold
+            )
+        );
+        
+        // 方法1: 直接距離チェック
+        if (directDistance < dynamicThreshold) {
+            return {
+                isClosed: true,
+                method: '直接距離',
+                details: `距離: ${directDistance.toFixed(1)}px, 閾値: ${dynamicThreshold.toFixed(1)}px`
+            };
+        }
+        
+        // 方法2: 終点から開始点に向かう複数点チェック
+        const lastFewPoints = Math.min(8, Math.floor(path.length * 0.15));
+        for (let i = 1; i <= lastFewPoints; i++) {
+            const checkPoint = path[path.length - 1 - i];
+            const checkDistance = Math.sqrt(
+                Math.pow(startPoint.x - checkPoint.x, 2) +
+                Math.pow(startPoint.y - checkPoint.y, 2)
+            );
+            if (checkDistance < dynamicThreshold * 1.3) {
+                return {
+                    isClosed: true,
+                    method: '複数点チェック',
+                    details: `${i+1}点前との距離: ${checkDistance.toFixed(1)}px`
+                };
+            }
+        }
+        
+        // 方法3: 開始点周辺の範囲チェック
+        const startAreaRadius = dynamicThreshold * 1.8;
+        const endPointsInStartArea = path.slice(-Math.min(15, Math.floor(path.length * 0.25)))
+            .filter(point => {
+                const dist = Math.sqrt(
+                    Math.pow(startPoint.x - point.x, 2) +
+                    Math.pow(startPoint.y - point.y, 2)
+                );
+                return dist < startAreaRadius;
+            });
+        
+        if (endPointsInStartArea.length >= 2) {
+            return {
+                isClosed: true,
+                method: '範囲チェック',
+                details: `開始点周辺(${startAreaRadius.toFixed(1)}px)に${endPointsInStartArea.length}点検出`
+            };
+        }
+        
+        // 方法4: 中間点による近似チェック（描画速度が速い場合の対応）
+        if (path.length >= 10) {
+            const quarterPoint = Math.floor(path.length * 0.25);
+            const halfPoint = Math.floor(path.length * 0.5);
+            const threeQuarterPoint = Math.floor(path.length * 0.75);
+            
+            // 開始点から各分割点までの平均距離を計算
+            const distances = [quarterPoint, halfPoint, threeQuarterPoint].map(index => {
+                return Math.sqrt(
+                    Math.pow(startPoint.x - path[index].x, 2) +
+                    Math.pow(startPoint.y - path[index].y, 2)
+                );
+            });
+            
+            const avgDistanceFromStart = distances.reduce((a, b) => a + b, 0) / distances.length;
+            
+            // 終点が開始点から他の点と同程度の距離にある場合は閉じた図形の可能性
+            if (directDistance < avgDistanceFromStart * 0.5 && directDistance < dynamicThreshold * 2) {
+                return {
+                    isClosed: true,
+                    method: '中間点分析',
+                    details: `終点距離: ${directDistance.toFixed(1)}px, 平均距離: ${avgDistanceFromStart.toFixed(1)}px`
+                };
+            }
+        }
+        
+        // 方法5: 図形の面積に基づく判定（円形らしさ）
+        if (path.length >= 10) {
+            const area = boundingBox.width * boundingBox.height;
+            const perimeter = totalDistance;
+            
+            // 円形度を計算（完全な円なら1に近い）
+            const circularity = (4 * Math.PI * area) / (perimeter * perimeter);
+            
+            // より緩い条件で円形らしさをチェック
+            if (circularity > 0.2 && directDistance < dynamicThreshold * 2.5) {
+                return {
+                    isClosed: true,
+                    method: '形状分析',
+                    details: `円形度: ${circularity.toFixed(2)}, 距離: ${directDistance.toFixed(1)}px`
+                };
+            }
+        }
+        
+        return {
+            isClosed: false,
+            method: 'none',
+            details: `直接距離: ${directDistance.toFixed(1)}px > 閾値: ${dynamicThreshold.toFixed(1)}px, パス長: ${path.length}`
+        };
+    }
+    
+    // バウンディングボックスを計算する関数
+    function getBoundingBox(path) {
+        const minX = Math.min(...path.map(p => p.x));
+        const maxX = Math.max(...path.map(p => p.x));
+        const minY = Math.min(...path.map(p => p.y));
+        const maxY = Math.max(...path.map(p => p.y));
+        
+        return {
+            x: minX,
+            y: minY,
+            width: maxX - minX,
+            height: maxY - minY
+        };
+    }
+
+    // マーカー範囲をAIに送信
+    function sendMarkedAreaToAI(imageBlob) {
+        // AIチャットが開いていない場合は開く
+        if (!document.getElementById('chat-messages')) {
+            createAIChat();
+            
+            // 少し待ってから送信
+            setTimeout(() => {
+                sendScreenshotToAI(imageBlob, '赤いマーカーで囲んだ範囲について解説や説明を行ってください');
+            }, 500);
+        } else {
+            sendScreenshotToAI(imageBlob, '赤いマーカーで囲んだ範囲について解説や説明を行ってください');
+        }
+    }
+
+    // 親ページに適用
+    setupRightClickPaint(document);
+
+    // iframeに適用する関数
+    function applyToIframe(iframe) {
+        try {
+            if (iframe.contentDocument) {
+                setupRightClickPaint(iframe.contentDocument);
+            }
+        } catch (e) {
+            console.warn('iframeにアクセスできません:', e);
+        }
+    }
+
+    // 既存のiframeに適用
+    document.querySelectorAll('iframe').forEach(applyToIframe);
+
+    // iframeの内容が変更された時の監視
+    const observer = new MutationObserver((mutations) => {
+        mutations.forEach((mutation) => {
+            mutation.addedNodes.forEach((node) => {
+                if (node.nodeType === 1 && node.tagName === 'IFRAME') {
+                    node.addEventListener('load', () => applyToIframe(node));
+                }
+            });
+        });
+    });
+
+    observer.observe(document.body, { childList: true, subtree: true });
+
+    // プロキシiframeの読み込み完了を監視
+    const proxyIframe = document.getElementById('proxy-iframe');
+    if (proxyIframe) {
+        proxyIframe.addEventListener('load', () => {
+            applyToIframe(proxyIframe);
+        });
+    }
+
     // Markdownをレンダリングする関数（LaTeX対応）
     function renderMarkdown(text) {
         if (typeof marked === 'undefined' || typeof DOMPurify === 'undefined') {
+            // ライブラリが読み込まれていない場合は通常のテキストとして表示
             return text;
         }
         
         try {
+            // Markedの設定
             marked.setOptions({
-                breaks: true,
-                gfm: true,
-                headerIds: false,
-                mangle: false
+                breaks: true, // 改行を<br>に変換
+                gfm: true,    // GitHub Flavored Markdown
+                headerIds: false, // ヘッダーIDを無効化（セキュリティのため）
+                mangle: false     // メールアドレスの難読化を無効化
             });
             
+            // MarkdownをHTMLに変換
             const html = marked.parse(text);
             
+            // XSS攻撃を防ぐためにDOMPurifyでサニタイズ
             const cleanHtml = DOMPurify.sanitize(html, {
                 ALLOWED_TAGS: [
                     'p', 'br', 'strong', 'em', 'u', 'del', 's', 'mark',
@@ -829,13 +762,16 @@
                     'code', 'pre',
                     'a', 'img',
                     'table', 'thead', 'tbody', 'tr', 'th', 'td',
+                    // MathJax用のタグを許可
                     'span', 'div', 'script'
                 ],
                 ALLOWED_ATTR: [
                     'href', 'src', 'alt', 'title', 'target', 'rel',
+                    // MathJax用の属性を許可
                     'class', 'id', 'data-*', 'type'
                 ],
                 ALLOWED_URI_REGEXP: /^(?:(?:(?:f|ht)tps?|mailto|tel|callto|cid|xmpp):|[^a-z]|[a-z+.\-]+(?:[^a-z+.\-:]|$))/i,
+                // MathJax関連のscriptタグを許可
                 ALLOW_DATA_ATTR: true
             });
             
@@ -849,6 +785,7 @@
     // MathJaxでLaTeX数式をレンダリングする関数
     function renderMathInElement(element) {
         if (typeof MathJax !== 'undefined' && MathJax.typesetPromise) {
+            // 要素内のMathJaxを一度クリアしてから再レンダリング
             MathJax.typesetClear([element]);
             MathJax.typesetPromise([element]).then(() => {
                 console.log('MathJax rendering completed');
@@ -856,6 +793,7 @@
                 console.error('MathJax rendering error:', err);
             });
         } else {
+            // MathJaxが準備できていない場合は少し待ってから再試行
             setTimeout(() => {
                 if (typeof MathJax !== 'undefined' && MathJax.typesetPromise) {
                     MathJax.typesetClear([element]);
@@ -867,8 +805,90 @@
         }
     }
 
+    // スポイラー機能付きAIメッセージを作成する関数
+    function createAIMessageWithSpoiler(initialContent = '') {
+        const container = document.createElement('div');
+        Object.assign(container.style, {
+            maxWidth: '85%',
+            alignSelf: 'flex-start',
+            marginBottom: '12px'
+        });
+
+        // スポイラーボタン
+        const spoilerBtn = document.createElement('button');
+        spoilerBtn.innerHTML = '<i class="fas fa-eye-slash"></i> 答えを表示';
+        Object.assign(spoilerBtn.style, {
+            background: '#f59e0b',
+            color: 'white',
+            border: 'none',
+            padding: '6px 12px',
+            borderRadius: '8px 8px 0 0',
+            cursor: 'pointer',
+            fontSize: '12px',
+            fontWeight: '500',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '4px',
+            transition: 'all 0.2s ease',
+            width: '100%',
+            justifyContent: 'center'
+        });
+
+        // AIメッセージ本体
+        const aiMsg = document.createElement('div');
+        aiMsg.className = 'markdown-content ai-message-content';
+        Object.assign(aiMsg.style, {
+            background: '#ffffff',
+            padding: '12px 16px',
+            borderRadius: '0 0 16px 16px',
+            wordWrap: 'break-word',
+            fontSize: '14px',
+            lineHeight: '1.5',
+            border: '1px solid #e5e7eb',
+            borderTop: 'none',
+            boxShadow: '0 1px 3px rgba(0,0,0,0.1)',
+            color: '#374151',
+            display: 'none' // 初期状態では非表示
+        });
+
+        if (initialContent) {
+            aiMsg.textContent = initialContent;
+        }
+
+        let isVisible = false;
+
+        // スポイラーボタンのクリックイベント
+        spoilerBtn.addEventListener('click', () => {
+            isVisible = !isVisible;
+            if (isVisible) {
+                aiMsg.style.display = 'block';
+                spoilerBtn.innerHTML = '<i class="fas fa-eye"></i> 答えを隠す';
+                spoilerBtn.style.background = '#10b981';
+            } else {
+                aiMsg.style.display = 'none';
+                spoilerBtn.innerHTML = '<i class="fas fa-eye-slash"></i> 答えを表示';
+                spoilerBtn.style.background = '#f59e0b';
+            }
+        });
+
+        // ホバー効果
+        spoilerBtn.addEventListener('mouseover', () => {
+            spoilerBtn.style.opacity = '0.9';
+            spoilerBtn.style.transform = 'translateY(-1px)';
+        });
+        spoilerBtn.addEventListener('mouseout', () => {
+            spoilerBtn.style.opacity = '1';
+            spoilerBtn.style.transform = 'translateY(0)';
+        });
+
+        container.appendChild(spoilerBtn);
+        container.appendChild(aiMsg);
+
+        return container;
+    }
+
     // AI Chat functionality
-    let chatHistory = [];
+    let chatHistory = []; // チャット履歴を保存
     
     function createAIChat() {
         const winbox = new WinBox({
@@ -890,6 +910,8 @@
             background: '#ffffff',
             color: '#1a1a1a'
         });
+
+        // ヘッダーを削除してチャット領域を広くする
 
         // Chat Messages
         const chatMessages = document.createElement('div');
@@ -918,7 +940,7 @@
                 fontSize: '14px',
                 lineHeight: '1.5'
             });
-            welcomeMsg.textContent = 'わからない問題があれば聞いて下さい。画像もアップロードできます。';
+            welcomeMsg.textContent = 'わからない問題があれば聞いて下さい。';
             chatMessages.appendChild(welcomeMsg);
         } else {
             // 既存の履歴を表示
@@ -971,10 +993,12 @@
                         color: '#374151'
                     });
                     
+                    // MarkdownをHTMLとしてレンダリング
                     const renderedHtml = renderMarkdown(item.content);
                     aiMsg.innerHTML = renderedHtml;
                     chatMessages.appendChild(aiMsg);
                     
+                    // MathJaxでLaTeX数式をレンダリング
                     renderMathInElement(aiMsg);
                 }
             });
@@ -1025,6 +1049,25 @@
             color: '#6b7280'
         });
 
+        // 音声入力ボタン
+        const voiceBtn = document.createElement('button');
+        voiceBtn.innerHTML = '<i class="fas fa-microphone"></i>';
+        voiceBtn.title = '音声で質問';
+        Object.assign(voiceBtn.style, {
+            background: 'transparent',
+            border: 'none',
+            borderRadius: '6px',
+            width: '32px',
+            height: '32px',
+            cursor: 'pointer',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            fontSize: '14px',
+            transition: 'all 0.2s ease',
+            color: '#6b7280'
+        });
+
         // スクリーンキャプチャボタン
         const screenshotBtn = document.createElement('button');
         screenshotBtn.innerHTML = '<i class="fas fa-camera"></i>';
@@ -1043,6 +1086,86 @@
             transition: 'all 0.2s ease',
             color: '#6b7280'
         });
+
+        // 自動キャプチャトグルボタン
+        const autoToggleBtn = document.createElement('button');
+        autoToggleBtn.innerHTML = '<i class="fas fa-sync-alt"></i>';
+        autoToggleBtn.title = '自動画面キャプチャのオンオフ';
+        Object.assign(autoToggleBtn.style, {
+            background: 'transparent',
+            border: 'none',
+            borderRadius: '6px',
+            width: '32px',
+            height: '32px',
+            cursor: 'pointer',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            fontSize: '14px',
+            transition: 'all 0.2s ease',
+            color: '#6b7280',
+            opacity: autoScreenCapture ? '1' : '0.5'
+        });
+
+        // 音声自動読み上げトグルボタン
+        const ttsToggleBtn = document.createElement('button');
+        ttsToggleBtn.innerHTML = '<i class="fas fa-volume-up"></i>';
+        ttsToggleBtn.title = '音声自動読み上げのオンオフ';
+        Object.assign(ttsToggleBtn.style, {
+            background: 'transparent',
+            border: 'none',
+            borderRadius: '6px',
+            width: '32px',
+            height: '32px',
+            cursor: 'pointer',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            fontSize: '14px',
+            transition: 'all 0.2s ease',
+            color: '#6b7280'
+        });
+
+        // 音声機能の状態管理
+        let whisperService = null; // speechService から whisperService に変更
+        let isVoiceRecording = false;
+        let autoTTS = false; // 音声自動読み上げのオンオフ
+
+        // 自動キャプチャの状態を更新する関数
+        function updateAutoToggleButton() {
+            autoToggleBtn.style.opacity = autoScreenCapture ? '1' : '0.5';
+            autoToggleBtn.style.color = autoScreenCapture ? '#22c55e' : '#6b7280';
+            autoToggleBtn.title = autoScreenCapture ?
+                '自動画面キャプチャ: オン（クリックでオフ）' :
+                '自動画面キャプチャ: オフ（クリックでオン）';
+        }
+
+        // 音声読み上げトグルボタンの状態を更新する関数
+        function updateTTSToggleButton() {
+            ttsToggleBtn.style.opacity = autoTTS ? '1' : '0.5';
+            ttsToggleBtn.style.color = autoTTS ? '#22c55e' : '#6b7280';
+            ttsToggleBtn.title = autoTTS ?
+                '音声自動読み上げ: オン（クリックでオフ）' :
+                '音声自動読み上げ: オフ（クリックでオン）';
+            ttsToggleBtn.innerHTML = autoTTS ?
+                '<i class="fas fa-volume-up"></i>' :
+                '<i class="fas fa-volume-mute"></i>';
+        }
+
+        // 音声ボタンの状態を更新する関数
+        function updateVoiceButton() {
+            voiceBtn.style.color = isVoiceRecording ? '#ef4444' : '#6b7280';
+            voiceBtn.innerHTML = isVoiceRecording ?
+                '<i class="fas fa-stop"></i>' :
+                '<i class="fas fa-microphone"></i>';
+            voiceBtn.title = isVoiceRecording ?
+                '録音を停止' :
+                '音声で質問';
+        }
+
+        // 初期状態設定
+        updateTTSToggleButton();
+        updateVoiceButton();
 
         const chatInput = document.createElement('textarea');
         chatInput.id = 'chat-input';
@@ -1080,11 +1203,258 @@
             transition: 'all 0.2s ease'
         });
 
-        // Event listeners
+        // 画像ボタンのホバーエフェクト
+        imageBtn.addEventListener('mouseover', () => {
+            imageBtn.style.background = '#e2e8f0';
+            imageBtn.style.color = '#374151';
+        });
+        imageBtn.addEventListener('mouseout', () => {
+            imageBtn.style.background = 'transparent';
+            imageBtn.style.color = '#6b7280';
+        });
+
+        // 音声ボタンのホバーエフェクト
+        voiceBtn.addEventListener('mouseover', () => {
+            voiceBtn.style.background = '#e2e8f0';
+            voiceBtn.style.color = isVoiceRecording ? '#dc2626' : '#374151';
+        });
+        voiceBtn.addEventListener('mouseout', () => {
+            voiceBtn.style.background = 'transparent';
+            voiceBtn.style.color = isVoiceRecording ? '#ef4444' : '#6b7280';
+        });
+
+        // スクリーンキャプチャボタンのホバーエフェクト
+        screenshotBtn.addEventListener('mouseover', () => {
+            screenshotBtn.style.background = '#e2e8f0';
+            screenshotBtn.style.color = '#374151';
+        });
+        screenshotBtn.addEventListener('mouseout', () => {
+            screenshotBtn.style.background = 'transparent';
+            screenshotBtn.style.color = '#6b7280';
+        });
+
+        // 自動トグルボタンのホバーエフェクト
+        autoToggleBtn.addEventListener('mouseover', () => {
+            autoToggleBtn.style.background = '#e2e8f0';
+            autoToggleBtn.style.color = autoScreenCapture ? '#16a34a' : '#374151';
+        });
+        autoToggleBtn.addEventListener('mouseout', () => {
+            autoToggleBtn.style.background = 'transparent';
+            autoToggleBtn.style.color = autoScreenCapture ? '#22c55e' : '#6b7280';
+        });
+
+        // 音声読み上げトグルボタンのホバーエフェクト
+        ttsToggleBtn.addEventListener('mouseover', () => {
+            ttsToggleBtn.style.background = '#e2e8f0';
+            ttsToggleBtn.style.color = autoTTS ? '#16a34a' : '#374151';
+        });
+        ttsToggleBtn.addEventListener('mouseout', () => {
+            ttsToggleBtn.style.background = 'transparent';
+            ttsToggleBtn.style.color = autoTTS ? '#22c55e' : '#6b7280';
+        });
+
+        // 送信ボタンのホバーエフェクト
+        sendBtn.addEventListener('mouseover', () => {
+            sendBtn.style.background = '#2563eb';
+            sendBtn.style.transform = 'scale(1.05)';
+        });
+        sendBtn.addEventListener('mouseout', () => {
+            sendBtn.style.background = '#3b82f6';
+            sendBtn.style.transform = 'scale(1)';
+        });
+
+        // 画像ボタンのクリックイベント
         imageBtn.addEventListener('click', () => {
             imageInput.click();
         });
 
+        // 音声ボタンのクリックイベント
+        voiceBtn.addEventListener('click', async () => {
+            if (isVoiceRecording) {
+                // 録音停止
+                if (whisperService) {
+                    whisperService.stop();
+                }
+                isVoiceRecording = false;
+                updateVoiceButton();
+                // 録音停止メッセージは任意で表示
+            } else {
+                // 録音開始
+                // WebSocketのURLを指定 (自分の環境に合わせて変更してください)
+                const wsUrl = `ws://${window.location.host}/ws`;
+                whisperService = new WhisperStreamService(wsUrl);
+
+                // コールバックを設定
+                whisperService.onConnect = () => {
+                    console.log("接続成功！録音を開始します。");
+                    isVoiceRecording = true;
+                    updateVoiceButton();
+                    // UIに「録音中...」などのメッセージを表示
+                };
+
+                whisperService.onTranscript = (transcript) => {
+                    // 文字起こし結果をチャット入力欄に追記
+                    chatInput.value += transcript + " ";
+                };
+
+                whisperService.onError = (error) => {
+                    console.error("Whisper Service Error:", error);
+                    isVoiceRecording = false;
+                    updateVoiceButton();
+                    // UIにエラーメッセージを表示
+                    alert(error); // 簡単な例
+                };
+
+                whisperService.onDisconnect = () => {
+                    console.log("接続が切れました。");
+                    isVoiceRecording = false;
+                    updateVoiceButton();
+                };
+
+                // ストリーミング開始
+                whisperService.start();
+            }
+        });
+
+        // 音声読み上げトグルボタンのクリックイベント
+        ttsToggleBtn.addEventListener('click', () => {
+            // 音声読み上げのオンオフを切り替え
+            autoTTS = !autoTTS;
+            updateTTSToggleButton();
+
+            // 状態変更メッセージを表示
+            const chatMessages = document.getElementById('chat-messages');
+            if (chatMessages) {
+                const statusMsg = document.createElement('div');
+                Object.assign(statusMsg.style, {
+                    background: autoTTS ? '#dcfce7' : '#f3f4f6',
+                    padding: '10px 14px',
+                    borderRadius: '12px',
+                    maxWidth: '75%',
+                    alignSelf: 'center',
+                    fontSize: '12px',
+                    color: autoTTS ? '#166534' : '#6b7280',
+                    textAlign: 'center',
+                    margin: '6px auto',
+                    border: autoTTS ? '1px solid #bbf7d0' : '1px solid #e5e7eb'
+                });
+                statusMsg.innerHTML = autoTTS ?
+                    '<i class="fas fa-volume-up"></i> 音声読み上げ: オン' :
+                    '<i class="fas fa-volume-mute"></i> 音声読み上げ: オフ';
+                chatMessages.appendChild(statusMsg);
+                chatMessages.scrollTop = chatMessages.scrollHeight;
+            }
+        });
+
+        // スクリーンキャプチャボタンのクリックイベント
+        screenshotBtn.addEventListener('click', async () => {
+            if (isScreenCaptureActive) {
+                // 既にキャプチャが有効な場合は停止
+                if (screenCaptureStream) {
+                    screenCaptureStream.getTracks().forEach(track => track.stop());
+                }
+                isScreenCaptureActive = false;
+                screenCaptureStream = null;
+                screenCaptureVideo = null;
+                
+                // 自動キャプチャもオフにする
+                autoScreenCapture = false;
+                updateAutoToggleButton();
+                
+                // 停止メッセージを表示
+                const infoMsg = document.createElement('div');
+                Object.assign(infoMsg.style, {
+                    background: '#f3f4f6',
+                    padding: '10px 14px',
+                    borderRadius: '12px',
+                    maxWidth: '75%',
+                    alignSelf: 'center',
+                    fontSize: '12px',
+                    color: '#6b7280',
+                    textAlign: 'center',
+                    margin: '6px auto',
+                    border: '1px solid #e5e7eb'
+                });
+                infoMsg.innerHTML = '<i class="fas fa-camera-retro"></i> スクリーンキャプチャを停止しました。';
+                chatMessages.appendChild(infoMsg);
+                chatMessages.scrollTop = chatMessages.scrollHeight;
+                
+            } else {
+                // iOS の場合は代替手段を提案
+                if (isIOS()) {
+                    showIOSCaptureAlert();
+                    return;
+                }
+                
+                // 新しいキャプチャを開始
+                try {
+                    screenCaptureStream = await navigator.mediaDevices.getDisplayMedia({
+                        video: { mediaSource: 'screen' }
+                    });
+                    
+                    screenCaptureVideo = document.createElement('video');
+                    screenCaptureVideo.srcObject = screenCaptureStream;
+                    screenCaptureVideo.play();
+                    
+                    // ストリームが終了した時の処理
+                    screenCaptureStream.getVideoTracks()[0].addEventListener('ended', () => {
+                        isScreenCaptureActive = false;
+                        screenCaptureStream = null;
+                        screenCaptureVideo = null;
+                    });
+                    
+                    screenCaptureVideo.addEventListener('loadedmetadata', () => {
+                        isScreenCaptureActive = true;
+                        autoScreenCapture = true; // デフォルトで自動キャプチャを有効
+                        updateAutoToggleButton();
+                        
+                        // 自動キャプチャをデフォルトで有効にする
+                        autoScreenCapture = true;
+                        updateAutoToggleButton();
+                        
+                        // キャプチャ開始メッセージを表示
+                        const infoMsg = document.createElement('div');
+                        Object.assign(infoMsg.style, {
+                            background: '#dbeafe',
+                            padding: '10px 14px',
+                            borderRadius: '12px',
+                            maxWidth: '75%',
+                            alignSelf: 'center',
+                            fontSize: '12px',
+                            color: '#1e40af',
+                            textAlign: 'center',
+                            margin: '6px auto',
+                            border: '1px solid #bfdbfe'
+                        });
+                        infoMsg.innerHTML = '<i class="fas fa-camera"></i> キャプチャモード有効 | <i class="fas fa-sync-alt"></i>で自動送信切替';
+                        chatMessages.appendChild(infoMsg);
+                        chatMessages.scrollTop = chatMessages.scrollHeight;
+                    });
+                    
+                } catch (error) {
+                    console.error('スクリーンキャプチャエラー:', error);
+                    // エラーメッセージを表示
+                    const errorMsg = document.createElement('div');
+                    Object.assign(errorMsg.style, {
+                        background: '#fef2f2',
+                        padding: '10px 14px',
+                        borderRadius: '12px',
+                        maxWidth: '75%',
+                        alignSelf: 'center',
+                        fontSize: '12px',
+                        color: '#dc2626',
+                        textAlign: 'center',
+                        margin: '6px auto',
+                        border: '1px solid #fecaca'
+                    });
+                    errorMsg.innerHTML = '<i class="fas fa-exclamation-triangle"></i> キャプチャに失敗しました';
+                    chatMessages.appendChild(errorMsg);
+                    chatMessages.scrollTop = chatMessages.scrollHeight;
+                }
+            }
+        });
+
+        // 画像選択時のイベント
         imageInput.addEventListener('change', (e) => {
             const file = e.target.files[0];
             if (file) {
@@ -1094,48 +1464,126 @@
             }
         });
 
-        screenshotBtn.addEventListener('click', async () => {
-            if (isIOS()) {
-                showIOSCaptureAlert();
+        // 自動トグルボタンのクリックイベント
+        autoToggleBtn.addEventListener('click', () => {
+            if (!isScreenCaptureActive) {
+                // スクリーンキャプチャが無効な場合は警告メッセージ
+                const warningMsg = document.createElement('div');
+                Object.assign(warningMsg.style, {
+                    background: '#fef2f2',
+                    padding: '10px 14px',
+                    borderRadius: '12px',
+                    maxWidth: '75%',
+                    alignSelf: 'center',
+                    fontSize: '12px',
+                    color: '#dc2626',
+                    textAlign: 'center',
+                    margin: '6px auto',
+                    border: '1px solid #fecaca'
+                });
+                warningMsg.innerHTML = '<i class="fas fa-camera"></i> 先にキャプチャを有効にしてください';
+                chatMessages.appendChild(warningMsg);
+                chatMessages.scrollTop = chatMessages.scrollHeight;
                 return;
             }
-            
-            try {
-                const stream = await navigator.mediaDevices.getDisplayMedia({
-                    video: { mediaSource: 'screen' }
-                });
-                
-                const video = document.createElement('video');
-                video.srcObject = stream;
-                video.play();
-                
-                video.addEventListener('loadedmetadata', () => {
-                    const canvas = document.createElement('canvas');
-                    canvas.width = video.videoWidth;
-                    canvas.height = video.videoHeight;
-                    const ctx = canvas.getContext('2d');
-                    ctx.drawImage(video, 0, 0);
-                    
-                    canvas.toBlob((blob) => {
-                        sendScreenshotToAI(blob, chatInput.value.trim() || '画面の内容について説明してください');
-                        chatInput.value = '';
-                        stream.getTracks().forEach(track => track.stop());
-                    });
-                });
-                
-            } catch (error) {
-                console.error('スクリーンキャプチャエラー:', error);
-                alert('スクリーンキャプチャに失敗しました。');
-            }
+
+            // 自動キャプチャのオンオフを切り替え
+            autoScreenCapture = !autoScreenCapture;
+            updateAutoToggleButton();
+
+            // 状態変更メッセージを表示
+            const statusMsg = document.createElement('div');
+            Object.assign(statusMsg.style, {
+                background: autoScreenCapture ? '#dcfce7' : '#f3f4f6',
+                padding: '10px 14px',
+                borderRadius: '12px',
+                maxWidth: '75%',
+                alignSelf: 'center',
+                fontSize: '12px',
+                color: autoScreenCapture ? '#166534' : '#6b7280',
+                textAlign: 'center',
+                margin: '6px auto',
+                border: autoScreenCapture ? '1px solid #bbf7d0' : '1px solid #e5e7eb'
+            });
+            statusMsg.innerHTML = autoScreenCapture ?
+                '<i class="fas fa-toggle-on"></i> 自動送信: オン' :
+                '<i class="fas fa-toggle-off"></i> 自動送信: オフ';
+            chatMessages.appendChild(statusMsg);
+            chatMessages.scrollTop = chatMessages.scrollHeight;
+        });
+
+        inputContainer.appendChild(imageBtn);
+        inputContainer.appendChild(voiceBtn);
+        inputContainer.appendChild(screenshotBtn);
+        inputContainer.appendChild(autoToggleBtn);
+        inputContainer.appendChild(ttsToggleBtn);
+        inputContainer.appendChild(chatInput);
+        inputContainer.appendChild(sendBtn);
+        inputArea.appendChild(imageInput);
+        inputArea.appendChild(inputContainer);
+
+        // Assemble the UI (ヘッダーなし)
+        container.appendChild(chatMessages);
+        container.appendChild(inputArea);
+
+        // Set the content to WinBox
+        winbox.body.appendChild(container);
+
+        // Add functionality
+        chatInput.addEventListener('input', function() {
+            this.style.height = 'auto';
+            this.style.height = Math.min(this.scrollHeight, 120) + 'px';
         });
 
         async function sendMessage() {
             const message = chatInput.value.trim();
             if (!message) return;
 
+            // Clear input first
             chatInput.value = '';
             chatInput.style.height = 'auto';
 
+            // 自動スクリーンキャプチャが有効な場合は、現在の画面をキャプチャして送信
+            if (isScreenCaptureActive && autoScreenCapture && !isIOS()) {
+                try {
+                    const screenBlob = await captureCurrentScreen();
+                    sendScreenshotToAI(screenBlob, message);
+                } catch (error) {
+                    console.error('画面キャプチャエラー:', error);
+                    
+                    // iOS の場合は専用のメッセージを表示
+                    if (isIOS()) {
+                        const chatMessages = document.getElementById('chat-messages');
+                        if (chatMessages) {
+                            const errorMsg = document.createElement('div');
+                            Object.assign(errorMsg.style, {
+                                background: '#fff7ed',
+                                padding: '10px 14px',
+                                borderRadius: '12px',
+                                maxWidth: '75%',
+                                alignSelf: 'center',
+                                fontSize: '12px',
+                                color: '#c2410c',
+                                textAlign: 'center',
+                                margin: '6px auto',
+                                border: '1px solid #fed7aa'
+                            });
+                            errorMsg.innerHTML = `<i class="fas fa-mobile-alt"></i> iOSでは<i class="fas fa-paperclip"></i>ボタンから画像をアップロード`;
+                            chatMessages.appendChild(errorMsg);
+                            chatMessages.scrollTop = chatMessages.scrollHeight;
+                        }
+                    }
+                    
+                    // キャプチャに失敗した場合は通常のテキストメッセージを送信
+                    sendNormalTextMessage(message);
+                }
+            } else {
+                // 通常のテキストメッセージを送信
+                sendNormalTextMessage(message);
+            }
+        }
+
+        function sendNormalTextMessage(message) {
             // チャット履歴にユーザーメッセージを保存
             chatHistory.push({
                 type: 'user',
@@ -1159,28 +1607,18 @@
             });
             userMsg.textContent = message;
             chatMessages.appendChild(userMsg);
+
+            // Scroll to bottom
             chatMessages.scrollTop = chatMessages.scrollHeight;
 
-            // AI response
-            const aiMsg = document.createElement('div');
-            Object.assign(aiMsg.style, {
-                background: '#ffffff',
-                padding: '12px 16px',
-                borderRadius: '16px 16px 16px 4px',
-                maxWidth: '85%',
-                alignSelf: 'flex-start',
-                wordWrap: 'break-word',
-                fontSize: '14px',
-                lineHeight: '1.5',
-                border: '1px solid #e5e7eb',
-                boxShadow: '0 1px 3px rgba(0,0,0,0.1)',
-                color: '#374151'
-            });
-            aiMsg.textContent = '考え中...';
-            chatMessages.appendChild(aiMsg);
+            // AI response with spoiler functionality
+            const aiMsgContainer = createAIMessageWithSpoiler('');
+            chatMessages.appendChild(aiMsgContainer);
             chatMessages.scrollTop = chatMessages.scrollHeight;
             
-            await sendTextToAI(message, aiMsg);
+            // テキストのみの場合のAPI呼び出し
+            const aiMsg = aiMsgContainer.querySelector('.ai-message-content');
+            sendTextToAI(message, aiMsg, aiMsgContainer);
         }
 
         sendBtn.addEventListener('click', sendMessage);
@@ -1192,23 +1630,7 @@
             }
         });
 
-        chatInput.addEventListener('input', function() {
-            this.style.height = 'auto';
-            this.style.height = Math.min(this.scrollHeight, 120) + 'px';
-        });
-
-        inputContainer.appendChild(imageBtn);
-        inputContainer.appendChild(screenshotBtn);
-        inputContainer.appendChild(chatInput);
-        inputContainer.appendChild(sendBtn);
-        inputArea.appendChild(imageInput);
-        inputArea.appendChild(inputContainer);
-
-        container.appendChild(chatMessages);
-        container.appendChild(inputArea);
-
-        winbox.body.appendChild(container);
-
+        // Focus input on window open
         setTimeout(() => chatInput.focus(), 100);
     }
 
@@ -1217,245 +1639,161 @@
         createAIChat();
     }
 
+    // グローバル変数でスクリーンキャプチャストリームを保存
+    let screenCaptureStream = null;
+    let screenCaptureVideo = null;
+    let isScreenCaptureActive = false;
+    let autoScreenCapture = false; // 自動画面キャプチャのオンオフ
+
     // スクリーンキャプチャ付きでAIチャットを開く関数
     async function openAIWithScreenshot() {
-        createAIChat();
-    }
-
-    // テキストのみをAIに送信する関数
-    async function sendTextToAI(message, responseElement) {
-        let aiResponse = '';
-        try {
-            responseElement.textContent = '考え中...';
-
-            const response = await fetch('/api/text', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json'
-                },
-                body: JSON.stringify({ message })
-            });
-
-            if (!response.ok) {
-                throw new Error(`HTTP error! status: ${response.status}`);
-            }
-
-            const reader = response.body.getReader();
-            const decoder = new TextDecoder();
-            responseElement.textContent = '';
-            let buffer = '';
-
-            while (true) {
-                const { done, value } = await reader.read();
-                if (done) break;
-
-                const chunk = decoder.decode(value, { stream: true });
-                buffer += chunk;
-                
-                const lines = buffer.split('\n');
-                buffer = lines.pop() || '';
-                
-                for (const line of lines) {
-                    if (line.trim()) {
-                        try {
-                            const jsonData = JSON.parse(line);
-                            if (jsonData.type === 'content' && jsonData.content) {
-                                aiResponse += jsonData.content;
-                                
-                                const renderedHtml = renderMarkdown(aiResponse);
-                                responseElement.innerHTML = renderedHtml;
-                                
-                                renderMathInElement(responseElement);
-                                
-                                const chatMessages = document.getElementById('chat-messages');
-                                if (chatMessages) {
-                                    chatMessages.scrollTop = chatMessages.scrollHeight;
-                                }
-                            } else if (jsonData.type === 'error') {
-                                throw new Error(jsonData.error || 'テキスト処理中にエラーが発生しました');
-                            }
-                        } catch (parseError) {
-                            console.warn('JSON解析エラー:', parseError, 'データ:', line);
-                            if (!line.startsWith('{')) {
-                                aiResponse += line;
-                                const renderedHtml = renderMarkdown(aiResponse);
-                                responseElement.innerHTML = renderedHtml;
-                                renderMathInElement(responseElement);
-                                
-                                const chatMessages = document.getElementById('chat-messages');
-                                if (chatMessages) {
-                                    chatMessages.scrollTop = chatMessages.scrollHeight;
-                                }
-                            }
-                        }
-                    }
+        // iOS の場合は代替手段を提案してチャットを開く
+        if (isIOS()) {
+            createAIChat();
+            setTimeout(() => {
+                const chatMessages = document.getElementById('chat-messages');
+                if (chatMessages) {
+                    const infoMsg = document.createElement('div');
+                    Object.assign(infoMsg.style, {
+                        background: '#fff7ed',
+                        padding: '10px 14px',
+                        borderRadius: '12px',
+                        maxWidth: '75%',
+                        alignSelf: 'center',
+                        fontSize: '12px',
+                        color: '#c2410c',
+                        textAlign: 'center',
+                        margin: '6px auto',
+                        border: '1px solid #fed7aa'
+                    });
+                    infoMsg.innerHTML = `<i class="fas fa-mobile-alt"></i> iOS: <i class="fas fa-paperclip"></i>ボタンから画像をアップロード`;
+                    chatMessages.appendChild(infoMsg);
+                    chatMessages.scrollTop = chatMessages.scrollHeight;
                 }
-            }
-
-            if (aiResponse) {
-                chatHistory.push({
-                    type: 'ai',
-                    content: aiResponse,
-                    timestamp: new Date()
-                });
-            }
-
-        } catch (error) {
-            console.error('AI API Error:', error);
-            const errorMsg = 'エラーが発生しました。Gemini APIキーが正しく設定されているか確認してください。';
-            responseElement.textContent = errorMsg;
-            
-            chatHistory.push({
-                type: 'ai',
-                content: errorMsg,
-                timestamp: new Date()
+            }, 100);
+            return;
+        }
+        
+        try {
+            // スクリーンキャプチャストリームを取得して保持
+            screenCaptureStream = await navigator.mediaDevices.getDisplayMedia({
+                video: { mediaSource: 'screen' }
             });
+            
+            // ビデオ要素を作成してストリームを設定
+            screenCaptureVideo = document.createElement('video');
+            screenCaptureVideo.srcObject = screenCaptureStream;
+            screenCaptureVideo.play();
+            
+            // ストリームが終了した時の処理
+            screenCaptureStream.getVideoTracks()[0].addEventListener('ended', () => {
+                isScreenCaptureActive = false;
+                screenCaptureStream = null;
+                screenCaptureVideo = null;
+            });
+            
+            screenCaptureVideo.addEventListener('loadedmetadata', () => {
+                isScreenCaptureActive = true;
+                autoScreenCapture = true; // デフォルトで自動キャプチャを有効
+                
+                // AIチャットウィンドウを開く
+                createAIChat();
+                
+                // キャプチャ有効メッセージを表示
+                setTimeout(() => {
+                    const chatMessages = document.getElementById('chat-messages');
+                    if (chatMessages) {
+                        const infoMsg = document.createElement('div');
+                        Object.assign(infoMsg.style, {
+                            background: '#dbeafe',
+                            padding: '10px 14px',
+                            borderRadius: '12px',
+                            maxWidth: '75%',
+                            alignSelf: 'center',
+                            fontSize: '12px',
+                            color: '#1e40af',
+                            textAlign: 'center',
+                            margin: '6px auto',
+                            border: '1px solid #bfdbfe'
+                        });
+                        infoMsg.innerHTML = '<i class="fas fa-camera"></i> キャプチャモード有効 | <i class="fas fa-sync-alt"></i>で自動送信切替';
+                        chatMessages.appendChild(infoMsg);
+                        chatMessages.scrollTop = chatMessages.scrollHeight;
+                    }
+                }, 100);
+            });
+            
+        } catch (error) {
+            console.error('スクリーンキャプチャエラー:', error);
+            // エラーの場合、通常のチャットを開く
+            createAIChat();
+            setTimeout(() => {
+                const chatMessages = document.getElementById('chat-messages');
+                if (chatMessages) {
+                    const infoMsg = document.createElement('div');
+                    Object.assign(infoMsg.style, {
+                        background: '#f3f4f6',
+                        padding: '10px 14px',
+                        borderRadius: '12px',
+                        maxWidth: '75%',
+                        alignSelf: 'center',
+                        fontSize: '12px',
+                        color: '#6b7280',
+                        textAlign: 'center',
+                        margin: '6px auto',
+                        border: '1px solid #e5e7eb'
+                    });
+                    infoMsg.innerHTML = '<i class="fas fa-info-circle"></i> 通常チャットモードで開始しました';
+                    chatMessages.appendChild(infoMsg);
+                    chatMessages.scrollTop = chatMessages.scrollHeight;
+                }
+            }, 100);
         }
     }
 
-    // 画像をAIに送信する関数
-    async function sendImageToAI(imageFile, prompt) {
-        const chatMessages = document.getElementById('chat-messages');
-        if (!chatMessages) return;
+    // 音声AI専用ウィンドウを開く関数
+    function openVoiceAI() {
+        createVoiceAIChat();
+    }
 
-        const imageUrl = URL.createObjectURL(imageFile);
-        
-        chatHistory.push({
-            type: 'user',
-            content: prompt,
-            image: imageUrl,
-            timestamp: new Date()
-        });
-
-        const userMsg = document.createElement('div');
-        Object.assign(userMsg.style, {
-            background: '#3b82f6',
-            color: 'white',
-            padding: '12px 16px',
-            borderRadius: '16px 16px 4px 16px',
-            maxWidth: '85%',
-            alignSelf: 'flex-end',
-            wordWrap: 'break-word',
-            fontSize: '14px',
-            lineHeight: '1.5',
-            boxShadow: '0 1px 3px rgba(0,0,0,0.1)'
-        });
-
-        const imagePreview = document.createElement('img');
-        imagePreview.src = imageUrl;
-        Object.assign(imagePreview.style, {
-            maxWidth: '200px',
-            maxHeight: '200px',
-            borderRadius: '8px',
-            marginBottom: '8px',
-            display: 'block'
-        });
-        
-        const textPart = document.createElement('div');
-        textPart.textContent = prompt;
-        
-        userMsg.appendChild(imagePreview);
-        userMsg.appendChild(textPart);
-        chatMessages.appendChild(userMsg);
-        chatMessages.scrollTop = chatMessages.scrollHeight;
-
-        const aiMsg = document.createElement('div');
-        aiMsg.className = 'markdown-content';
-        Object.assign(aiMsg.style, {
-            background: '#ffffff',
-            padding: '12px 16px',
-            borderRadius: '16px 16px 16px 4px',
-            maxWidth: '85%',
-            alignSelf: 'flex-start',
-            wordWrap: 'break-word',
-            fontSize: '14px',
-            lineHeight: '1.5',
-            border: '1px solid #e5e7eb',
-            boxShadow: '0 1px 3px rgba(0,0,0,0.1)',
-            color: '#374151'
-        });
-        aiMsg.textContent = '分析中...';
-        chatMessages.appendChild(aiMsg);
-        chatMessages.scrollTop = chatMessages.scrollHeight;
-
-        let aiResponse = '';
-        try {
-            const formData = new FormData();
-            formData.append('image', imageFile);
-            formData.append('prompt', prompt);
-
-            const response = await fetch('/api/aireq', {
-                method: 'POST',
-                body: formData
-            });
-
-            if (!response.ok) {
-                throw new Error(`HTTP error! status: ${response.status}`);
+    // 現在の画面をキャプチャしてBlobとして取得する関数
+    function captureCurrentScreen() {
+        return new Promise(async (resolve, reject) => {
+            // iOS の場合はエラーを返す
+            if (isIOS()) {
+                reject(new Error('iOSではスクリーンキャプチャAPIが利用できません。スクリーンショットを撮影して画像をアップロードしてください。'));
+                return;
             }
-
-            const reader = response.body.getReader();
-            const decoder = new TextDecoder();
-            aiMsg.textContent = '';
-            let buffer = '';
-
-            while (true) {
-                const { done, value } = await reader.read();
-                if (done) break;
-
-                const chunk = decoder.decode(value, { stream: true });
-                buffer += chunk;
-                
-                const lines = buffer.split('\n');
-                buffer = lines.pop() || '';
-                
-                for (const line of lines) {
-                    if (line.trim()) {
-                        try {
-                            const jsonData = JSON.parse(line);
-                            if (jsonData.type === 'content' && jsonData.content) {
-                                aiResponse += jsonData.content;
-                                
-                                const renderedHtml = renderMarkdown(aiResponse);
-                                aiMsg.innerHTML = renderedHtml;
-                                
-                                renderMathInElement(aiMsg);
-                                chatMessages.scrollTop = chatMessages.scrollHeight;
-                            } else if (jsonData.type === 'error') {
-                                throw new Error(jsonData.error || '画像解析中にエラーが発生しました');
-                            }
-                        } catch (parseError) {
-                            console.warn('JSON解析エラー:', parseError, 'データ:', line);
-                            if (!line.startsWith('{')) {
-                                aiResponse += line;
-                                const renderedHtml = renderMarkdown(aiResponse);
-                                aiMsg.innerHTML = renderedHtml;
-                                renderMathInElement(aiMsg);
-                                chatMessages.scrollTop = chatMessages.scrollHeight;
-                            }
-                        }
-                    }
-                }
-            }
-
-            if (aiResponse) {
-                chatHistory.push({
-                    type: 'ai',
-                    content: aiResponse,
-                    timestamp: new Date()
-                });
-            }
-
-        } catch (error) {
-            console.error('Image AI API Error:', error);
-            const errorMsg = 'エラーが発生しました。画像の解析ができませんでした。';
-            aiMsg.textContent = errorMsg;
             
-            chatHistory.push({
-                type: 'ai',
-                content: errorMsg,
-                timestamp: new Date()
-            });
-        }
+            if (!isScreenCaptureActive || !screenCaptureVideo) {
+                reject(new Error('スクリーンキャプチャが無効です'));
+                return;
+            }
+            
+            // WinBoxウインドウを一時的に非表示
+            const hiddenWindows = hideAllWinBoxWindows();
+            
+            // 少し待ってからキャプチャ（非表示が反映されるまで）
+            await new Promise(resolve => setTimeout(resolve, 100));
+            
+            try {
+                const canvas = document.createElement('canvas');
+                canvas.width = screenCaptureVideo.videoWidth;
+                canvas.height = screenCaptureVideo.videoHeight;
+                const ctx = canvas.getContext('2d');
+                ctx.drawImage(screenCaptureVideo, 0, 0);
+                
+                canvas.toBlob((blob) => {
+                    // キャプチャ完了後にWinBoxウインドウを再表示
+                    showWinBoxWindows(hiddenWindows);
+                    resolve(blob);
+                }, 'image/png');
+            } catch (error) {
+                // エラーが発生した場合もWinBoxウインドウを再表示
+                showWinBoxWindows(hiddenWindows);
+                reject(error);
+            }
+        });
     }
 
     // スクリーンショットをAIに送信する関数
@@ -1463,8 +1801,10 @@
         const chatMessages = document.getElementById('chat-messages');
         if (!chatMessages) return;
 
+        // 画像をBase64として保存するためのURL
         const imageUrl = URL.createObjectURL(imageBlob);
         
+        // チャット履歴にユーザーメッセージ（画像付き）を保存
         chatHistory.push({
             type: 'user',
             content: prompt,
@@ -1472,6 +1812,7 @@
             timestamp: new Date()
         });
 
+        // ユーザーメッセージを表示（画像プレビュー付き）
         const userMsg = document.createElement('div');
         Object.assign(userMsg.style, {
             background: '#3b82f6',
@@ -1486,6 +1827,7 @@
             boxShadow: '0 1px 3px rgba(0,0,0,0.1)'
         });
 
+        // 画像プレビューを作成
         const imagePreview = document.createElement('img');
         imagePreview.src = imageUrl;
         Object.assign(imagePreview.style, {
@@ -1504,6 +1846,7 @@
         chatMessages.appendChild(userMsg);
         chatMessages.scrollTop = chatMessages.scrollHeight;
 
+        // AIレスポンス用の要素を作成
         const aiMsg = document.createElement('div');
         aiMsg.className = 'markdown-content';
         Object.assign(aiMsg.style, {
@@ -1525,10 +1868,12 @@
 
         let aiResponse = '';
         try {
+            // FormDataを作成
             const formData = new FormData();
             formData.append('image', imageBlob, 'screenshot.png');
             formData.append('prompt', prompt);
 
+            // APIリクエストを送信
             const response = await fetch('/api/aireq', {
                 method: 'POST',
                 body: formData
@@ -1538,6 +1883,7 @@
                 throw new Error(`HTTP error! status: ${response.status}`);
             }
 
+            // ストリーミングレスポンスを処理
             const reader = response.body.getReader();
             const decoder = new TextDecoder();
             aiMsg.textContent = '';
@@ -1550,8 +1896,9 @@
                 const chunk = decoder.decode(value, { stream: true });
                 buffer += chunk;
                 
+                // JSONラインを分割して処理
                 const lines = buffer.split('\n');
-                buffer = lines.pop() || '';
+                buffer = lines.pop() || ''; // 最後の不完全な行を保持
                 
                 for (const line of lines) {
                     if (line.trim()) {
@@ -1560,9 +1907,11 @@
                             if (jsonData.type === 'content' && jsonData.content) {
                                 aiResponse += jsonData.content;
                                 
+                                // リアルタイムでMarkdownレンダリング
                                 const renderedHtml = renderMarkdown(aiResponse);
                                 aiMsg.innerHTML = renderedHtml;
                                 
+                                // MathJaxでLaTeX数式をレンダリング
                                 renderMathInElement(aiMsg);
                                 chatMessages.scrollTop = chatMessages.scrollHeight;
                             } else if (jsonData.type === 'error') {
@@ -1570,6 +1919,7 @@
                             }
                         } catch (parseError) {
                             console.warn('JSON解析エラー:', parseError, 'データ:', line);
+                            // JSON以外のデータの場合は直接追加
                             if (!line.startsWith('{')) {
                                 aiResponse += line;
                                 const renderedHtml = renderMarkdown(aiResponse);
@@ -1581,7 +1931,33 @@
                     }
                 }
             }
+            
+            // 残りのバッファも処理
+            if (buffer.trim()) {
+                try {
+                    const jsonData = JSON.parse(buffer);
+                    if (jsonData.type === 'content' && jsonData.content) {
+                        aiResponse += jsonData.content;
+                        const renderedHtml = renderMarkdown(aiResponse);
+                        aiMsg.innerHTML = renderedHtml;
+                        renderMathInElement(aiMsg);
+                        chatMessages.scrollTop = chatMessages.scrollHeight;
+                    } else if (jsonData.type === 'error') {
+                        throw new Error(jsonData.error || '画像解析中にエラーが発生しました');
+                    }
+                } catch (parseError) {
+                    console.warn('最終バッファ解析エラー:', parseError, 'データ:', buffer);
+                    if (!buffer.startsWith('{')) {
+                        aiResponse += buffer;
+                        const renderedHtml = renderMarkdown(aiResponse);
+                        aiMsg.innerHTML = renderedHtml;
+                        renderMathInElement(aiMsg);
+                        chatMessages.scrollTop = chatMessages.scrollHeight;
+                    }
+                }
+            }
 
+            // AIの返答をチャット履歴に保存
             if (aiResponse) {
                 chatHistory.push({
                     type: 'ai',
@@ -1595,6 +1971,7 @@
             const errorMsg = 'エラーが発生しました。スクリーンショットの解析ができませんでした。';
             aiMsg.textContent = errorMsg;
             
+            // エラーメッセージもチャット履歴に保存
             chatHistory.push({
                 type: 'ai',
                 content: errorMsg,
@@ -1603,6 +1980,818 @@
         }
     }
 
+    // テキストのみをAIに送信する関数
+    async function sendTextToAI(message, responseElement) {
+        let aiResponse = '';
+        try {
+            // 処理中表示
+            responseElement.textContent = '考え中...';
+
+            // APIリクエストを送信
+            const response = await fetch('/api/text', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({ message })
+            });
+
+            if (!response.ok) {
+                throw new Error(`HTTP error! status: ${response.status}`);
+            }
+
+            // ストリーミングレスポンスを処理
+            const reader = response.body.getReader();
+            const decoder = new TextDecoder();
+            responseElement.textContent = '';
+            let buffer = '';
+
+            while (true) {
+                const { done, value } = await reader.read();
+                if (done) break;
+
+                const chunk = decoder.decode(value, { stream: true });
+                buffer += chunk;
+                
+                // JSONラインを分割して処理
+                const lines = buffer.split('\n');
+                buffer = lines.pop() || ''; // 最後の不完全な行を保持
+                
+                for (const line of lines) {
+                    if (line.trim()) {
+                        try {
+                            const jsonData = JSON.parse(line);
+                            if (jsonData.type === 'content' && jsonData.content) {
+                                aiResponse += jsonData.content;
+                                
+                                // リアルタイムでMarkdownレンダリング
+                                const renderedHtml = renderMarkdown(aiResponse);
+                                responseElement.innerHTML = renderedHtml;
+                                
+                                // MathJaxでLaTeX数式をレンダリング
+                                renderMathInElement(responseElement);
+                                
+                                // チャットメッセージエリアを下にスクロール
+                                const chatMessages = document.getElementById('chat-messages');
+                                if (chatMessages) {
+                                    chatMessages.scrollTop = chatMessages.scrollHeight;
+                                }
+                            } else if (jsonData.type === 'error') {
+                                throw new Error(jsonData.error || 'テキスト処理中にエラーが発生しました');
+                            }
+                        } catch (parseError) {
+                            console.warn('JSON解析エラー:', parseError, 'データ:', line);
+                            // JSON以外のデータの場合は直接追加
+                            if (!line.startsWith('{')) {
+                                aiResponse += line;
+                                const renderedHtml = renderMarkdown(aiResponse);
+                                responseElement.innerHTML = renderedHtml;
+                                renderMathInElement(responseElement);
+                                
+                                const chatMessages = document.getElementById('chat-messages');
+                                if (chatMessages) {
+                                    chatMessages.scrollTop = chatMessages.scrollHeight;
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+            
+            // 残りのバッファも処理
+            if (buffer.trim()) {
+                try {
+                    const jsonData = JSON.parse(buffer);
+                    if (jsonData.type === 'content' && jsonData.content) {
+                        aiResponse += jsonData.content;
+                        const renderedHtml = renderMarkdown(aiResponse);
+                        responseElement.innerHTML = renderedHtml;
+                        renderMathInElement(responseElement);
+                        
+                        const chatMessages = document.getElementById('chat-messages');
+                        if (chatMessages) {
+                            chatMessages.scrollTop = chatMessages.scrollHeight;
+                        }
+                    } else if (jsonData.type === 'error') {
+                        throw new Error(jsonData.error || 'テキスト処理中にエラーが発生しました');
+                    }
+                } catch (parseError) {
+                    console.warn('最終バッファ解析エラー:', parseError, 'データ:', buffer);
+                    if (!buffer.startsWith('{')) {
+                        aiResponse += buffer;
+                        const renderedHtml = renderMarkdown(aiResponse);
+                        responseElement.innerHTML = renderedHtml;
+                        renderMathInElement(responseElement);
+                        
+                        const chatMessages = document.getElementById('chat-messages');
+                        if (chatMessages) {
+                            chatMessages.scrollTop = chatMessages.scrollHeight;
+                        }
+                    }
+                }
+            }
+
+            // AIの返答をチャット履歴に保存
+            if (aiResponse) {
+                chatHistory.push({
+                    type: 'ai',
+                    content: aiResponse,
+                    timestamp: new Date()
+                });
+
+                // 自動音声読み上げが有効な場合、AIの回答を読み上げ
+                if (autoTTS && speechService) {
+                    // Markdownタグを除去してプレーンテキストに変換
+                    const plainText = aiResponse
+                        .replace(/#{1,6}\s+/g, '') // ヘッダー
+                        .replace(/\*\*(.*?)\*\*/g, '$1') // 太字
+                        .replace(/\*(.*?)\*/g, '$1') // 斜体
+                        .replace(/`(.*?)`/g, '$1') // インラインコード
+                        .replace(/```[\s\S]*?```/g, '[コードブロック]') // コードブロック
+                        .replace(/\$\$([\s\S]*?)\$\$/g, '[数式]') // ディスプレイ数式
+                        .replace(/\$(.*?)\$/g, '[数式]') // インライン数式
+                        .replace(/\[([^\]]*)\]\([^)]*\)/g, '$1') // リンク
+                        .replace(/\n+/g, ' ') // 改行を半角スペースに
+                        .trim();
+                    
+                    if (plainText) {
+                        try {
+                            await speechService.textToSpeech(plainText);
+                        } catch (error) {
+                            console.error('音声読み上げエラー:', error);
+                        }
+                    }
+                }
+            }
+
+        } catch (error) {
+            console.error('AI API Error:', error);
+            const errorMsg = 'エラーが発生しました。Gemini APIキーが正しく設定されているか確認してください。';
+            responseElement.textContent = errorMsg;
+            
+            // エラーメッセージもチャット履歴に保存
+            chatHistory.push({
+                type: 'ai',
+                content: errorMsg,
+                timestamp: new Date()
+            });
+        }
+    }
+
+    // 画像をAIに送信する関数
+    async function sendImageToAI(imageFile, prompt) {
+        const chatMessages = document.getElementById('chat-messages');
+        if (!chatMessages) return;
+
+        // 画像をBase64として保存するためのURL
+        const imageUrl = URL.createObjectURL(imageFile);
+        
+        // チャット履歴にユーザーメッセージ（画像付き）を保存
+        chatHistory.push({
+            type: 'user',
+            content: prompt,
+            image: imageUrl,
+            timestamp: new Date()
+        });
+
+        // ユーザーメッセージを表示（画像プレビュー付き）
+        const userMsg = document.createElement('div');
+        Object.assign(userMsg.style, {
+            background: '#3b82f6',
+            color: 'white',
+            padding: '12px 16px',
+            borderRadius: '16px 16px 4px 16px',
+            maxWidth: '85%',
+            alignSelf: 'flex-end',
+            wordWrap: 'break-word',
+            fontSize: '14px',
+            lineHeight: '1.5',
+            boxShadow: '0 1px 3px rgba(0,0,0,0.1)'
+        });
+
+        // 画像プレビューを作成
+        const imagePreview = document.createElement('img');
+        imagePreview.src = imageUrl;
+        Object.assign(imagePreview.style, {
+            maxWidth: '200px',
+            maxHeight: '200px',
+            borderRadius: '8px',
+            marginBottom: '8px',
+            display: 'block'
+        });
+        
+        const textPart = document.createElement('div');
+        textPart.textContent = prompt;
+        
+        userMsg.appendChild(imagePreview);
+        userMsg.appendChild(textPart);
+        chatMessages.appendChild(userMsg);
+        chatMessages.scrollTop = chatMessages.scrollHeight;
+
+        // AIレスポンス用の要素を作成
+        const aiMsg = document.createElement('div');
+        aiMsg.className = 'markdown-content';
+        Object.assign(aiMsg.style, {
+            background: '#ffffff',
+            padding: '12px 16px',
+            borderRadius: '16px 16px 16px 4px',
+            maxWidth: '85%',
+            alignSelf: 'flex-start',
+            wordWrap: 'break-word',
+            fontSize: '14px',
+            lineHeight: '1.5',
+            border: '1px solid #e5e7eb',
+            boxShadow: '0 1px 3px rgba(0,0,0,0.1)',
+            color: '#374151'
+        });
+        aiMsg.textContent = '分析中...';
+        chatMessages.appendChild(aiMsg);
+        chatMessages.scrollTop = chatMessages.scrollHeight;
+
+        let aiResponse = '';
+        try {
+            // FormDataを作成
+            const formData = new FormData();
+            formData.append('image', imageFile);
+            formData.append('prompt', prompt);
+
+            // APIリクエストを送信
+            const response = await fetch('/api/aireq', {
+                method: 'POST',
+                body: formData
+            });
+
+            if (!response.ok) {
+                throw new Error(`HTTP error! status: ${response.status}`);
+            }
+
+            // ストリーミングレスポンスを処理
+            const reader = response.body.getReader();
+            const decoder = new TextDecoder();
+            aiMsg.textContent = '';
+            let buffer = '';
+
+            while (true) {
+                const { done, value } = await reader.read();
+                if (done) break;
+
+                const chunk = decoder.decode(value, { stream: true });
+                buffer += chunk;
+                
+                // JSONラインを分割して処理
+                const lines = buffer.split('\n');
+                buffer = lines.pop() || ''; // 最後の不完全な行を保持
+                
+                for (const line of lines) {
+                    if (line.trim()) {
+                        try {
+                            const jsonData = JSON.parse(line);
+                            if (jsonData.type === 'content' && jsonData.content) {
+                                aiResponse += jsonData.content;
+                                
+                                // リアルタイムでMarkdownレンダリング
+                                const renderedHtml = renderMarkdown(aiResponse);
+                                aiMsg.innerHTML = renderedHtml;
+                                
+                                // MathJaxでLaTeX数式をレンダリング
+                                renderMathInElement(aiMsg);
+                                chatMessages.scrollTop = chatMessages.scrollHeight;
+                            } else if (jsonData.type === 'error') {
+                                throw new Error(jsonData.error || '画像解析中にエラーが発生しました');
+                            }
+                        } catch (parseError) {
+                            console.warn('JSON解析エラー:', parseError, 'データ:', line);
+                            // JSON以外のデータの場合は直接追加
+                            if (!line.startsWith('{')) {
+                                aiResponse += line;
+                                const renderedHtml = renderMarkdown(aiResponse);
+                                aiMsg.innerHTML = renderedHtml;
+                                renderMathInElement(aiMsg);
+                                chatMessages.scrollTop = chatMessages.scrollHeight;
+                            }
+                        }
+                    }
+                }
+            }
+            
+            // 残りのバッファも処理
+            if (buffer.trim()) {
+                try {
+                    const jsonData = JSON.parse(buffer);
+                    if (jsonData.type === 'content' && jsonData.content) {
+                        aiResponse += jsonData.content;
+                        const renderedHtml = renderMarkdown(aiResponse);
+                        aiMsg.innerHTML = renderedHtml;
+                        renderMathInElement(aiMsg);
+                        chatMessages.scrollTop = chatMessages.scrollHeight;
+                    } else if (jsonData.type === 'error') {
+                        throw new Error(jsonData.error || '画像解析中にエラーが発生しました');
+                    }
+                } catch (parseError) {
+                    console.warn('最終バッファ解析エラー:', parseError, 'データ:', buffer);
+                    if (!buffer.startsWith('{')) {
+                        aiResponse += buffer;
+                        const renderedHtml = renderMarkdown(aiResponse);
+                        aiMsg.innerHTML = renderedHtml;
+                        renderMathInElement(aiMsg);
+                        chatMessages.scrollTop = chatMessages.scrollHeight;
+                    }
+                }
+            }
+
+            // AIの返答をチャット履歴に保存
+            if (aiResponse) {
+                chatHistory.push({
+                    type: 'ai',
+                    content: aiResponse,
+                    timestamp: new Date()
+                });
+            }
+
+        } catch (error) {
+            console.error('Image AI API Error:', error);
+            const errorMsg = 'エラーが発生しました。画像の解析ができませんでした。';
+            aiMsg.textContent = errorMsg;
+            
+            // エラーメッセージもチャット履歴に保存
+            chatHistory.push({
+                type: 'ai',
+                content: errorMsg,
+                timestamp: new Date()
+            });
+        }
+
+    }
+
+    // 音声メッセージ送信機能
+    function sendVoiceMessage(transcript) {
+        const chatMessages = document.getElementById('chat-messages');
+        if (!chatMessages) return;
+
+        // チャット履歴にユーザーメッセージを保存
+        chatHistory.push({
+            type: 'user',
+            content: transcript,
+            timestamp: new Date()
+        });
+
+        // ユーザーメッセージを表示（音声アイコン付き）
+        const userMsg = document.createElement('div');
+        Object.assign(userMsg.style, {
+            background: '#3b82f6',
+            color: 'white',
+            padding: '12px 16px',
+            borderRadius: '16px 16px 4px 16px',
+            maxWidth: '85%',
+            alignSelf: 'flex-end',
+            wordWrap: 'break-word',
+            fontSize: '14px',
+            lineHeight: '1.5',
+            boxShadow: '0 1px 3px rgba(0,0,0,0.1)'
+        });
+        
+        const voiceIcon = document.createElement('span');
+        voiceIcon.innerHTML = '<i class="fas fa-microphone" style="margin-right: 6px; opacity: 0.8;"></i>';
+        
+        const textSpan = document.createElement('span');
+        textSpan.textContent = transcript;
+        
+        userMsg.appendChild(voiceIcon);
+        userMsg.appendChild(textSpan);
+        chatMessages.appendChild(userMsg);
+        chatMessages.scrollTop = chatMessages.scrollHeight;
+
+        // AIレスポンス用の要素を作成
+        const aiMsg = document.createElement('div');
+        aiMsg.className = 'markdown-content';
+        Object.assign(aiMsg.style, {
+            background: '#ffffff',
+            padding: '12px 16px',
+            borderRadius: '16px 16px 16px 4px',
+            maxWidth: '85%',
+            alignSelf: 'flex-start',
+            wordWrap: 'break-word',
+            fontSize: '14px',
+            lineHeight: '1.5',
+            border: '1px solid #e5e7eb',
+            boxShadow: '0 1px 3px rgba(0,0,0,0.1)',
+            color: '#374151'
+        });
+        aiMsg.textContent = '音声を処理中...';
+        chatMessages.appendChild(aiMsg);
+        chatMessages.scrollTop = chatMessages.scrollHeight;
+
+        // テキストのみの場合のAPI呼び出し
+        sendTextToAI(transcript, aiMsg);
+    }
+
+    // 音声AI専用チャットウィンドウを作成
+    function createVoiceAIChat() {
+            const winbox = new WinBox({
+                title: "🎤 音声AI アシスタント",
+                width: 420,
+                height: 600,
+                x: "center",
+                y: "center",
+                background: "linear-gradient(135deg, #667eea 0%, #764ba2 100%)"
+            });
+
+            // 音声チャット用のコンテナを作成
+            const container = document.createElement('div');
+            container.id = 'voice-ai-container';
+            Object.assign(container.style, {
+                display: 'flex',
+                flexDirection: 'column',
+                height: '100%',
+                fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
+                background: 'linear-gradient(135deg, #f8fafc 0%, #e2e8f0 100%)',
+                color: '#1a1a1a'
+            });
+
+            // ヘッダー
+            const header = document.createElement('div');
+            Object.assign(header.style, {
+                padding: '20px',
+                background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+                color: 'white',
+                textAlign: 'center',
+                borderRadius: '0 0 20px 20px',
+                marginBottom: '20px',
+                boxShadow: '0 4px 20px rgba(0,0,0,0.1)'
+            });
+            header.innerHTML = `
+                <h2 style="margin: 0 0 10px 0; font-size: 22px; font-weight: 600;">
+                    <i class="fas fa-microphone" style="margin-right: 10px;"></i>
+                    音声AI アシスタント
+                </h2>
+                <p style="margin: 0; opacity: 0.9; font-size: 14px;">
+                    マイクボタンを押して話しかけてください
+                </p>
+            `;
+
+            // チャットメッセージエリア
+            const chatMessages = document.createElement('div');
+            chatMessages.id = 'voice-chat-messages';
+            Object.assign(chatMessages.style, {
+                flex: '1',
+                padding: '0 20px',
+                overflowY: 'auto',
+                display: 'flex',
+                flexDirection: 'column',
+                gap: '15px'
+            });
+
+            // ウェルカムメッセージ
+            const welcomeMsg = document.createElement('div');
+            Object.assign(welcomeMsg.style, {
+                background: 'white',
+                padding: '16px 20px',
+                borderRadius: '20px',
+                boxShadow: '0 2px 10px rgba(0,0,0,0.1)',
+                alignSelf: 'flex-start',
+                maxWidth: '85%',
+                border: '2px solid #e2e8f0'
+            });
+            welcomeMsg.innerHTML = `
+                <div style="display: flex; align-items: center; margin-bottom: 8px;">
+                    <i class="fas fa-robot" style="color: #667eea; margin-right: 8px; font-size: 16px;"></i>
+                    <span style="font-weight: 600; color: #374151;">AI アシスタント</span>
+                </div>
+                <p style="margin: 0; color: #6b7280; line-height: 1.5;">
+                    こんにちは！音声で何でもお聞きください。<br>
+                    勉強の質問、問題の解説、なんでもお手伝いします！
+                </p>
+            `;
+            chatMessages.appendChild(welcomeMsg);
+
+            // コントロールエリア
+            const controlArea = document.createElement('div');
+            Object.assign(controlArea.style, {
+                padding: '20px',
+                background: 'white',
+                borderRadius: '20px 20px 0 0',
+                margin: '20px 20px 0 20px',
+                boxShadow: '0 -4px 20px rgba(0,0,0,0.1)',
+                textAlign: 'center'
+            });
+
+            // 音声機能の状態管理
+            let voiceSpeechService = null;
+            let isVoiceListening = false;
+            let voiceAutoTTS = true; // デフォルトで音声読み上げオン
+
+            // メイン音声ボタン
+            const mainVoiceBtn = document.createElement('button');
+            mainVoiceBtn.innerHTML = '<i class="fas fa-microphone"></i>';
+            Object.assign(mainVoiceBtn.style, {
+                width: '80px',
+                height: '80px',
+                borderRadius: '50%',
+                border: 'none',
+                background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+                color: 'white',
+                fontSize: '32px',
+                cursor: 'pointer',
+                transition: 'all 0.3s ease',
+                boxShadow: '0 8px 25px rgba(102, 126, 234, 0.3)',
+                marginBottom: '15px'
+            });
+
+            // 音声読み上げトグル
+            const voiceTTSToggle = document.createElement('button');
+            voiceTTSToggle.innerHTML = '<i class="fas fa-volume-up"></i> 音声読み上げ: ON';
+            Object.assign(voiceTTSToggle.style, {
+                background: '#22c55e',
+                color: 'white',
+                border: 'none',
+                padding: '10px 20px',
+                borderRadius: '25px',
+                cursor: 'pointer',
+                fontSize: '14px',
+                fontWeight: '500',
+                marginTop: '10px',
+                transition: 'all 0.2s ease'
+            });
+
+            // 音声ボタンの状態更新
+            function updateMainVoiceButton() {
+                if (isVoiceListening) {
+                    mainVoiceBtn.innerHTML = '<i class="fas fa-stop"></i>';
+                    mainVoiceBtn.style.background = 'linear-gradient(135deg, #ef4444 0%, #dc2626 100%)';
+                    mainVoiceBtn.style.boxShadow = '0 8px 25px rgba(239, 68, 68, 0.4)';
+                    mainVoiceBtn.style.transform = 'scale(1.1)';
+                } else {
+                    mainVoiceBtn.innerHTML = '<i class="fas fa-microphone"></i>';
+                    mainVoiceBtn.style.background = 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)';
+                    mainVoiceBtn.style.boxShadow = '0 8px 25px rgba(102, 126, 234, 0.3)';
+                    mainVoiceBtn.style.transform = 'scale(1)';
+                }
+            }
+
+            // TTSトグルボタンの状態更新
+            function updateTTSToggle() {
+                if (voiceAutoTTS) {
+                    voiceTTSToggle.innerHTML = '<i class="fas fa-volume-up"></i> 音声読み上げ: ON';
+                    voiceTTSToggle.style.background = '#22c55e';
+                } else {
+                    voiceTTSToggle.innerHTML = '<i class="fas fa-volume-mute"></i> 音声読み上げ: OFF';
+                    voiceTTSToggle.style.background = '#6b7280';
+                }
+            }
+
+            controlArea.appendChild(mainVoiceBtn);
+            controlArea.appendChild(document.createElement('br'));
+            controlArea.appendChild(voiceTTSToggle);
+
+            // コンテナに要素を追加
+            container.appendChild(header);
+            container.appendChild(chatMessages);
+            container.appendChild(controlArea);
+
+            // WinBoxに設定
+            winbox.body.appendChild(container);
+
+            // 音声メッセージ送信関数
+            async function sendVoiceAIMessage(transcript) {
+                if (!transcript || !transcript.trim()) return;
+
+                const messageText = transcript.trim();
+
+                // ユーザーメッセージを表示
+                const userMsg = document.createElement('div');
+                Object.assign(userMsg.style, {
+                    background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+                    color: 'white',
+                    padding: '16px 20px',
+                    borderRadius: '20px 20px 5px 20px',
+                    maxWidth: '85%',
+                    alignSelf: 'flex-end',
+                    wordWrap: 'break-word',
+                    fontSize: '14px',
+                    lineHeight: '1.5',
+                    boxShadow: '0 2px 10px rgba(102, 126, 234, 0.3)'
+                });
+                
+                userMsg.innerHTML = `
+                    <div style="display: flex; align-items: center; margin-bottom: 8px;">
+                        <i class="fas fa-microphone" style="margin-right: 8px; opacity: 0.9;"></i>
+                        <span style="font-weight: 600;">あなた</span>
+                    </div>
+                    <p style="margin: 0;">${messageText}</p>
+                `;
+                chatMessages.appendChild(userMsg);
+                chatMessages.scrollTop = chatMessages.scrollHeight;
+
+                // AI応答用の要素を作成
+                const aiMsg = document.createElement('div');
+                Object.assign(aiMsg.style, {
+                    background: 'white',
+                    padding: '16px 20px',
+                    borderRadius: '20px 20px 20px 5px',
+                    maxWidth: '85%',
+                    alignSelf: 'flex-start',
+                    wordWrap: 'break-word',
+                    fontSize: '14px',
+                    lineHeight: '1.5',
+                    border: '2px solid #e2e8f0',
+                    boxShadow: '0 2px 10px rgba(0,0,0,0.1)',
+                    color: '#374151'
+                });
+                
+                aiMsg.innerHTML = `
+                    <div style="display: flex; align-items: center; margin-bottom: 8px;">
+                        <i class="fas fa-robot" style="color: #667eea; margin-right: 8px;"></i>
+                        <span style="font-weight: 600; color: #374151;">AI アシスタント</span>
+                    </div>
+                    <div class="ai-response-content">考え中...</div>
+                `;
+                chatMessages.appendChild(aiMsg);
+                chatMessages.scrollTop = chatMessages.scrollHeight;
+
+                // API呼び出し
+                const responseContent = aiMsg.querySelector('.ai-response-content');
+                await sendTextToAIForVoice(messageText, responseContent);
+            }
+
+            // 音声AI用のテキスト送信関数
+            async function sendTextToAIForVoice(message, responseElement) {
+                let aiResponse = '';
+                try {
+                    const response = await fetch('/api/text', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json'
+                        },
+                        body: JSON.stringify({ message })
+                    });
+
+                    if (!response.ok) {
+                        throw new Error(`HTTP error! status: ${response.status}`);
+                    }
+
+                    const reader = response.body.getReader();
+                    const decoder = new TextDecoder();
+                    responseElement.innerHTML = '';
+                    let buffer = '';
+
+                    while (true) {
+                        const { done, value } = await reader.read();
+                        if (done) break;
+
+                        const chunk = decoder.decode(value, { stream: true });
+                        buffer += chunk;
+                        
+                        const lines = buffer.split('\n');
+                        buffer = lines.pop() || '';
+                        
+                        for (const line of lines) {
+                            if (line.trim()) {
+                                try {
+                                    const jsonData = JSON.parse(line);
+                                    if (jsonData.type === 'content' && jsonData.content) {
+                                        aiResponse += jsonData.content;
+                                        const renderedHtml = renderMarkdown(aiResponse);
+                                        responseElement.innerHTML = renderedHtml;
+                                        renderMathInElement(responseElement);
+                                        chatMessages.scrollTop = chatMessages.scrollHeight;
+                                    }
+                                } catch (parseError) {
+                                    if (!line.startsWith('{')) {
+                                        aiResponse += line;
+                                        const renderedHtml = renderMarkdown(aiResponse);
+                                        responseElement.innerHTML = renderedHtml;
+                                        renderMathInElement(responseElement);
+                                        chatMessages.scrollTop = chatMessages.scrollHeight;
+                                    }
+                                }
+                            }
+                        }
+                    }
+                    
+                    if (buffer.trim()) {
+                        try {
+                            const jsonData = JSON.parse(buffer);
+                            if (jsonData.type === 'content' && jsonData.content) {
+                                aiResponse += jsonData.content;
+                                const renderedHtml = renderMarkdown(aiResponse);
+                                responseElement.innerHTML = renderedHtml;
+                                renderMathInElement(responseElement);
+                                chatMessages.scrollTop = chatMessages.scrollHeight;
+                            }
+                        } catch (parseError) {
+                            if (!buffer.startsWith('{')) {
+                                aiResponse += buffer;
+                                const renderedHtml = renderMarkdown(aiResponse);
+                                responseElement.innerHTML = renderedHtml;
+                                renderMathInElement(responseElement);
+                                chatMessages.scrollTop = chatMessages.scrollHeight;
+                            }
+                        }
+                    }
+
+                    // 音声読み上げ
+                    if (voiceAutoTTS && aiResponse && voiceSpeechService) {
+                        const plainText = aiResponse
+                            .replace(/#{1,6}\s+/g, '')
+                            .replace(/\*\*(.*?)\*\*/g, '$1')
+                            .replace(/\*(.*?)\*/g, '$1')
+                            .replace(/`(.*?)`/g, '$1')
+                            .replace(/```[\s\S]*?```/g, '[コードブロック]')
+                            .replace(/\$\$([\s\S]*?)\$\$/g, '[数式]')
+                            .replace(/\$(.*?)\$/g, '[数式]')
+                            .replace(/\[([^\]]*)\]\([^)]*\)/g, '$1')
+                            .replace(/\n+/g, ' ')
+                            .trim();
+                        
+                        if (plainText) {
+                            try {
+                                await voiceSpeechService.textToSpeech(plainText);
+                            } catch (error) {
+                                console.error('音声読み上げエラー:', error);
+                            }
+                        }
+                    }
+
+                } catch (error) {
+                    console.error('AI API Error:', error);
+                    responseElement.innerHTML = 'エラーが発生しました。もう一度お試しください。';
+                }
+            }
+
+            // イベントリスナー
+            mainVoiceBtn.addEventListener('click', async () => {
+                if (!SpeechService.isSupported()) {
+                    alert('お使いのブラウザは音声認識をサポートしていません');
+                    return;
+                }
+
+                if (!isVoiceListening) {
+                    // 録音開始
+                    if (!voiceSpeechService) {
+                        voiceSpeechService = new SpeechService();
+                    }
+                    
+                    isVoiceListening = true;
+                    updateMainVoiceButton();
+                    
+                    try {
+                        await voiceSpeechService.startRecording(
+                            (transcript) => {
+                                if (transcript && transcript.trim()) {
+                                    isVoiceListening = false;
+                                    updateMainVoiceButton();
+                                    voiceSpeechService.stopRecording();
+                                    sendVoiceAIMessage(transcript.trim());
+                                }
+                            },
+                            (error) => {
+                                console.error('音声認識エラー:', error);
+                                isVoiceListening = false;
+                                updateMainVoiceButton();
+                            },
+                            (status) => {
+                                console.log('音声認識ステータス:', status);
+                            }
+                        );
+                    } catch (error) {
+                        console.error('録音開始エラー:', error);
+                        isVoiceListening = false;
+                        updateMainVoiceButton();
+                    }
+                } else {
+                    // 録音停止
+                    isVoiceListening = false;
+                    updateMainVoiceButton();
+                    if (voiceSpeechService) {
+                        voiceSpeechService.stopRecording();
+                    }
+                }
+            });
+
+            voiceTTSToggle.addEventListener('click', () => {
+                voiceAutoTTS = !voiceAutoTTS;
+                updateTTSToggle();
+            });
+
+            // ホバーエフェクト
+            mainVoiceBtn.addEventListener('mouseover', () => {
+                if (!isVoiceListening) {
+                    mainVoiceBtn.style.transform = 'scale(1.05)';
+                }
+            });
+            mainVoiceBtn.addEventListener('mouseout', () => {
+                if (!isVoiceListening) {
+                    mainVoiceBtn.style.transform = 'scale(1)';
+                }
+            });
+
+            voiceTTSToggle.addEventListener('mouseover', () => {
+                voiceTTSToggle.style.opacity = '0.9';
+            });
+            voiceTTSToggle.addEventListener('mouseout', () => {
+                voiceTTSToggle.style.opacity = '1';
+            });
+        }
   </script>
   <script src="assets/js/iframe-proxy.js"></script>
 </body>

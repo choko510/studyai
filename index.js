@@ -14,7 +14,6 @@ import multer from "multer";
 import { GoogleGenerativeAI } from "@google/generative-ai";
 import { WebSocketServer, WebSocket } from 'ws';
 import config from "./config.js";
-import { GoogleAuth } from 'google-auth-library';
 
 console.log(chalk.yellow("🚀 Starting server..."));
 
@@ -200,6 +199,11 @@ app.get("/e/*", async (req, res, next) => {
 app.use(cookieParser());
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
+
+/* if (process.env.MASQR === "true") {
+  console.log(chalk.green("Masqr is enabled"));
+  setupMasqr(app);
+} */
 
 app.use(express.static(path.join(__dirname, "static")));
 app.use("/ca", cors({ origin: true }));
@@ -477,297 +481,74 @@ app.post("/api/text-to-speech", async (req, res) => {
   }
 });
 
-// Google Multimodal Live API用のWebSocketサーバー
-const multimodalWss = new WebSocketServer({ server, path: '/ws/multimodal-live' });
+// WebSocket プロキシ - 音声認識のリアルタイム通信
+const wss = new WebSocketServer({ server, path: '/ws/speech' });
 
-// Multimodal Live APIセッション管理
-const multimodalSessions = new Map();
-
-multimodalWss.on('connection', async (ws, req) => {
-  const sessionId = `multimodal_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
-  console.log(`Multimodal Live セッション開始: ${sessionId}`);
+wss.on('connection', (ws, req) => {
+  console.log('WebSocket接続が確立されました（音声認識用）');
   
-  // セッション情報を保存
-  const session = {
-    id: sessionId,
-    ws: ws,
-    createdAt: Date.now(),
-    lastActivity: Date.now(),
-    audioBuffer: [],
-    videoFrames: [],
-    conversationHistory: []
-  };
+  // Pythonバックエンドへの接続を確立
+  let pythonWs;
   
-  multimodalSessions.set(sessionId, session);
-  
-  // セッション開始メッセージ
-  ws.send(JSON.stringify({
-    type: 'system',
-    content: 'Google Multimodal Live APIセッションが開始されました',
-    sessionId: sessionId
-  }));
-  
-  ws.on('message', async (message) => {
-    try {
-      session.lastActivity = Date.now();
-      const data = JSON.parse(message);
-      
-      switch (data.type) {
-        case 'audio':
-          await handleAudioData(session, data);
-          break;
-          
-        case 'video':
-          await handleVideoFrame(session, data);
-          break;
-          
-        case 'text':
-          await handleTextMessage(session, data);
-          break;
-          
-        default:
-          console.warn('未知のメッセージタイプ:', data.type);
+  try {
+    // WebSocketでPythonバックエンドに接続
+    pythonWs = new WebSocket(`ws://localhost:8000/ws`);
+    
+    pythonWs.on('open', () => {
+      console.log('Pythonバックエンドとの接続が確立されました');
+    });
+    
+    pythonWs.on('message', (data) => {
+      // Pythonバックエンドからのメッセージをクライアントに転送
+      if (ws.readyState === ws.OPEN) {
+        ws.send(data);
       }
-      
-    } catch (error) {
-      console.error('Multimodal Live メッセージ処理エラー:', error);
-      ws.send(JSON.stringify({
-        type: 'error',
-        content: 'メッセージの処理中にエラーが発生しました'
-      }));
+    });
+    
+    pythonWs.on('error', (error) => {
+      console.error('Pythonバックエンド接続エラー:', error);
+      if (ws.readyState === ws.OPEN) {
+        ws.send(JSON.stringify({ error: 'バックエンド接続エラー' }));
+      }
+    });
+    
+    pythonWs.on('close', () => {
+      console.log('Pythonバックエンドとの接続が閉じられました');
+      if (ws.readyState === ws.OPEN) {
+        ws.close();
+      }
+    });
+    
+  } catch (error) {
+    console.error('Pythonバックエンドへの接続に失敗:', error);
+    if (ws.readyState === ws.OPEN) {
+      ws.send(JSON.stringify({ error: 'バックエンドへの接続に失敗しました' }));
+      ws.close();
+    }
+    return;
+  }
+  
+  ws.on('message', (message) => {
+    // クライアントからのメッセージをPythonバックエンドに転送
+    if (pythonWs && pythonWs.readyState === pythonWs.OPEN) {
+      pythonWs.send(message);
     }
   });
   
   ws.on('close', () => {
-    console.log(`Multimodal Live セッション終了: ${sessionId}`);
-    multimodalSessions.delete(sessionId);
+    console.log('クライアントWebSocket接続が閉じられました');
+    if (pythonWs && pythonWs.readyState === pythonWs.OPEN) {
+      pythonWs.close();
+    }
   });
   
   ws.on('error', (error) => {
-    console.error(`Multimodal Live セッションエラー: ${sessionId}`, error);
-    multimodalSessions.delete(sessionId);
+    console.error('WebSocketエラー:', error);
+    if (pythonWs && pythonWs.readyState === pythonWs.OPEN) {
+      pythonWs.close();
+    }
   });
 });
-
-// 音声データ処理
-async function handleAudioData(session, data) {
-  try {
-    // 音声データをバッファに追加
-    session.audioBuffer.push(...data.data);
-    
-    // 一定量のデータが溜まったら処理（例：1秒分）
-    const targetSamples = data.config.sampleRate; // 1秒分のサンプル数
-    
-    if (session.audioBuffer.length >= targetSamples) {
-      // 音声認識処理（簡易版 - 実際のGoogle Speech-to-Textを使用する場合）
-      const audioChunk = session.audioBuffer.splice(0, targetSamples);
-      
-      // 模擬的な音声認識結果（実際の実装では Google Speech-to-Text API を使用）
-      if (Math.random() > 0.7) { // 30%の確率で認識結果を返す（デモ用）
-        const mockTranscriptions = [
-          "こんにちは",
-          "画面に写っているものを説明してください",
-          "これは何ですか？",
-          "数学の問題を解いてください",
-          "今日の天気はどうですか？"
-        ];
-        
-        const transcription = mockTranscriptions[Math.floor(Math.random() * mockTranscriptions.length)];
-        
-        session.ws.send(JSON.stringify({
-          type: 'transcription',
-          content: transcription
-        }));
-        
-        // 音声認識結果をAIに送信
-        await processMultimodalInput(session, transcription, 'audio');
-      }
-    }
-    
-  } catch (error) {
-    console.error('音声データ処理エラー:', error);
-  }
-}
-
-// 映像フレーム処理
-async function handleVideoFrame(session, data) {
-  try {
-    // 最新の映像フレームのみ保持（メモリ節約）
-    session.videoFrames = [data];
-    
-    // フレームレート制限（処理負荷軽減のため）
-    const now = Date.now();
-    if (!session.lastVideoProcess || now - session.lastVideoProcess > 2000) { // 2秒に1回
-      session.lastVideoProcess = now;
-      
-      // 映像解析処理（定期的に実行）
-      if (session.videoFrames.length > 0) {
-        await processVideoAnalysis(session);
-      }
-    }
-    
-  } catch (error) {
-    console.error('映像フレーム処理エラー:', error);
-  }
-}
-
-// テキストメッセージ処理
-async function handleTextMessage(session, data) {
-  try {
-    session.ws.send(JSON.stringify({
-      type: 'system',
-      content: `テキストメッセージを受信: ${data.content}`
-    }));
-    
-    await processMultimodalInput(session, data.content, 'text');
-    
-  } catch (error) {
-    console.error('テキストメッセージ処理エラー:', error);
-  }
-}
-
-// マルチモーダル入力処理
-async function processMultimodalInput(session, content, inputType) {
-  try {
-    // 会話履歴に追加
-    session.conversationHistory.push({
-      role: 'user',
-      content: content,
-      type: inputType,
-      timestamp: Date.now()
-    });
-    
-    // システムプロンプト
-    const systemPrompt = `あなたはマルチモーダルAIアシスタントです。以下の特徴があります：
-
-1. **リアルタイム対話**: 音声、映像、テキストを同時に理解できます
-2. **コンテキスト理解**: 映像の内容と音声/テキストの関連性を理解します
-3. **教育支援**: 学習や問題解決をサポートします
-4. **自然な応答**: 簡潔で分かりやすい回答を心がけます
-
-現在の入力タイプ: ${inputType}
-${inputType === 'audio' ? '音声認識結果' : inputType === 'text' ? 'テキスト入力' : '映像解析'}
-
-応答は簡潔に、必要に応じて日本語で回答してください。`;
-
-    // Gemini APIを使用してレスポンス生成
-    const model = genAI.getGenerativeModel({ model: "gemini-2.0-flash" });
-    
-    let parts = [systemPrompt + "\n\nユーザー: " + content];
-    
-    // 映像フレームがある場合は追加
-    if (session.videoFrames.length > 0 && inputType !== 'text') {
-      const latestFrame = session.videoFrames[session.videoFrames.length - 1];
-      
-      // Base64データをGemini用の形式に変換
-      const imageData = {
-        inlineData: {
-          data: latestFrame.data,
-          mimeType: 'image/jpeg'
-        }
-      };
-      
-      parts = [
-        systemPrompt + "\n\n現在の映像とユーザーの" +
-        (inputType === 'audio' ? '音声入力' : 'メッセージ') +
-        "を分析してください。\n\nユーザー: " + content,
-        imageData
-      ];
-    }
-    
-    // ストリーミングでレスポンス生成
-    const result = await model.generateContentStream(parts);
-    
-    let fullResponse = '';
-    for await (const chunk of result.stream) {
-      const chunkText = chunk.text();
-      if (chunkText) {
-        fullResponse += chunkText;
-        
-        // リアルタイムでクライアントに送信
-        session.ws.send(JSON.stringify({
-          type: 'ai_response',
-          content: chunkText,
-          isPartial: true
-        }));
-      }
-    }
-    
-    // 完了通知
-    session.ws.send(JSON.stringify({
-      type: 'ai_response',
-      content: '',
-      isPartial: false,
-      isComplete: true
-    }));
-    
-    // 会話履歴に追加
-    session.conversationHistory.push({
-      role: 'assistant',
-      content: fullResponse,
-      type: 'response',
-      timestamp: Date.now()
-    });
-    
-    // 履歴を適切な長さに制限
-    if (session.conversationHistory.length > 20) {
-      session.conversationHistory = session.conversationHistory.slice(-20);
-    }
-    
-  } catch (error) {
-    console.error('マルチモーダル入力処理エラー:', error);
-    session.ws.send(JSON.stringify({
-      type: 'error',
-      content: 'AI処理中にエラーが発生しました: ' + error.message
-    }));
-  }
-}
-
-// 映像解析処理
-async function processVideoAnalysis(session) {
-  try {
-    if (session.videoFrames.length === 0) return;
-    
-    const latestFrame = session.videoFrames[session.videoFrames.length - 1];
-    
-    // 映像の内容をAIに分析させる
-    const model = genAI.getGenerativeModel({ model: "gemini-2.0-flash" });
-    
-    const imageData = {
-      inlineData: {
-        data: latestFrame.data,
-        mimeType: 'image/jpeg'
-      }
-    };
-    
-    const prompt = "この映像フレームの内容を簡潔に分析してください。特に注目すべき要素があれば教えてください。";
-    
-    const result = await model.generateContent([prompt, imageData]);
-    const analysis = result.response.text();
-    
-    // 分析結果をクライアントに送信（システムメッセージとして）
-    session.ws.send(JSON.stringify({
-      type: 'system',
-      content: `📹 映像分析: ${analysis}`
-    }));
-    
-  } catch (error) {
-    console.error('映像解析エラー:', error);
-  }
-}
-
-// 古いセッションの定期クリーンアップ
-setInterval(() => {
-  const now = Date.now();
-  for (const [sessionId, session] of multimodalSessions.entries()) {
-    // 30分以上非アクティブなセッションを削除
-    if (now - session.lastActivity > 30 * 60 * 1000) {
-      console.log(`非アクティブセッションを削除: ${sessionId}`);
-      session.ws.close();
-      multimodalSessions.delete(sessionId);
-    }
-  }
-}, 10 * 60 * 1000); // 10分ごとにチェック
 
 // API エラーハンドリング
 app.use("/api/*", (req, res) => {
