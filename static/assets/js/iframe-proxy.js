@@ -11,10 +11,6 @@ class IframeProxy {
     this.currentIndex = -1;
     this.defaultHome = 'https://google.com';
     
-    this.initializeEventListeners();
-    // iframeからのURL同期通知を受信
-    window.addEventListener('message', this.handleIframeMessage.bind(this));
-    
     // 初期ページを読み込み
     setTimeout(() => {
       this.navigate(this.defaultHome);
@@ -47,7 +43,6 @@ class IframeProxy {
     const processedUrl = this.processUrl(targetUrl);
     const proxyUrl = this.buildProxyUrl(processedUrl);
     
-    this.showLoading();
     this.hideError();
     
     // 履歴を更新（重複を避ける）
@@ -136,7 +131,6 @@ class IframeProxy {
   
   refresh() {
     if (this.iframe.src) {
-      this.showLoading();
       this.iframe.src = this.iframe.src;
     }
   }
@@ -147,14 +141,6 @@ class IframeProxy {
     
     backBtn.disabled = this.currentIndex <= 0;
     forwardBtn.disabled = this.currentIndex >= this.history.length - 1;
-  }
-  
-  showLoading() {
-    this.loadingEl.style.display = 'block';
-  }
-  
-  hideLoading() {
-    this.loadingEl.style.display = 'none';
   }
   
   showError(message) {
@@ -174,6 +160,7 @@ class IframeProxy {
       // URLを同期
       const proxySrc = this.iframe.src;
       const realUrl = this.extractRealUrlFromProxy(proxySrc) || proxySrc;
+      console.log('onIframeLoad:', realUrl);
       if (realUrl && realUrl !== this.urlInput.value) {
         this.urlInput.value = realUrl;
       }
@@ -192,13 +179,6 @@ class IframeProxy {
     this.showError('ページの読み込みに失敗しました。URLを確認してください。');
   }
   
-  openAI() {
-    // AI質問機能の実装
-    const aiUrl = 'https://chatgpt.com';
-    this.navigate(aiUrl);
-  }
-  
-  
   extractRealUrlFromProxy(proxyUrl) {
     try {
       // プロキシURLのパターン: /a/[encoded-url]
@@ -216,29 +196,6 @@ class IframeProxy {
       console.error('URL extraction failed:', error);
     }
     return null;
-  }
-  
-  handleIframeMessage(event) {
-    // iframe内からのURL変更通知を処理
-    if (event.data && event.data.type === 'url-changed') {
-      const newUrl = event.data.url;
-      if (newUrl && newUrl !== this.urlInput.value) {
-        this.urlInput.value = newUrl;
-        
-        // 履歴を更新（iframe内でのナビゲーションの場合）
-        if (this.history[this.currentIndex] !== newUrl) {
-          if (this.currentIndex < this.history.length - 1) {
-            this.history = this.history.slice(0, this.currentIndex + 1);
-          }
-          this.history.push(newUrl);
-          this.currentIndex = this.history.length - 1;
-          this.updateNavigationButtons();
-        }
-        
-        // タイトルも更新
-        document.title = `${this.extractDomain(newUrl)} - Interstellar Proxy`;
-      }
-    }
   }
 }
 
