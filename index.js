@@ -172,7 +172,6 @@ app.get("/e/*", async (req, res, next) => {
       return next();
     }
 
-    const asset = await fetch(reqTarget);
     if (!asset.ok) {
       return next();
     }
@@ -197,11 +196,6 @@ app.get("/e/*", async (req, res, next) => {
 app.use(cookieParser());
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
-
-/* if (process.env.MASQR === "true") {
-  console.log(chalk.green("Masqr is enabled"));
-  setupMasqr(app);
-} */
 
 app.use(express.static(path.join(__dirname, "static")));
 app.use("/ca", cors({ origin: true }));

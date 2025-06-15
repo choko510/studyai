@@ -22,7 +22,7 @@
         <button class="nav-btn" id="ai-btn" onclick="openAIWithScreenshot()">AI質問</button>
         <button class="nav-btn" id="voice-demo-btn" onclick="openVoiceDemo()">音声デモ</button>
       </div>
-      <input type="text" class="url-input" id="url-input" placeholder="URLまたは検索語句を入力..." value="https://google.com">
+      <input type="text" class="url-input" id="url-input" placeholder="URLまたは検索語句を入力...">
       <button class="go-btn" onclick="navigate()">移動</button>
     </div>
     
@@ -41,8 +41,6 @@
   <script src="https://cdn.jsdelivr.net/npm/dompurify@3.0.5/dist/purify.min.js"></script>
   <script id="MathJax-script" async src="https://cdn.jsdelivr.net/npm/mathjax@3.2.2/es5/tex-mml-chtml.js"></script>
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-  <script src="https://cdn.jsdelivr.net/npm/driver.js@1.3.6/dist/driver.js.iife.min.js"></script>
-  <link href="https://cdn.jsdelivr.net/npm/driver.js@1.3.6/dist/driver.min.css" rel="stylesheet">
 
   <script>
     // MathJax設定
@@ -83,8 +81,20 @@
           console.log('Service Worker registered for iframe proxy:', registration);
         }).catch((error) => {
           console.error('Service Worker registration failed:', error);
+          
+          // Safariで Service Worker 登録が失敗した場合の警告
+          if (isSafari()) {
+            console.warn('Safari: Service Worker の登録に失敗しました。一部機能が制限される可能性があります。');
+          }
         });
       });
+    } else {
+      // Service Worker が対応していない場合の警告
+      console.warn('このブラウザはService Workerに対応していません。一部機能が制限されます。');
+      
+      if (isSafari()) {
+        console.warn('Safari: Service Worker機能が利用できません。');
+      }
     }
 
     // iOS検出関数
@@ -92,6 +102,173 @@
         return /iPad|iPhone|iPod/.test(navigator.userAgent) ||
                (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
     }
+
+    // Safari検出関数
+    function isSafari() {
+        const userAgent = navigator.userAgent.toLowerCase();
+        return userAgent.includes('safari') && !userAgent.includes('chrome') && !userAgent.includes('chromium');
+    }
+
+    // Safari互換性チェック関数
+    function checkSafariCompatibility() {
+        if (!isSafari()) return { compatible: true };
+
+        const issues = [];
+        const warnings = [];
+
+        // Service Worker対応チェック
+        if (!('serviceWorker' in navigator)) {
+            issues.push('Service Worker');
+        }
+
+        // Screen Capture API対応チェック
+        if (!navigator.mediaDevices || !navigator.mediaDevices.getDisplayMedia) {
+            issues.push('画面キャプチャ機能');
+        }
+
+        // MediaRecorder対応チェック
+        if (!window.MediaRecorder) {
+            issues.push('音声録音機能');
+        } else {
+            // WebM形式のサポートチェック
+            if (!MediaRecorder.isTypeSupported('audio/webm')) {
+                warnings.push('音声録音の一部機能（WebM形式が未対応）');
+            }
+        }
+
+        // WebRTC/getUserMedia対応チェック
+        if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+            issues.push('マイクアクセス機能');
+        }
+
+        return {
+            compatible: issues.length === 0,
+            issues: issues,
+            warnings: warnings
+        };
+    }
+
+    // Safari互換性エラーを表示する関数
+    function showSafariCompatibilityAlert(compatibilityResult) {
+        const alertDiv = document.createElement('div');
+        Object.assign(alertDiv.style, {
+            position: 'fixed',
+            top: '50%',
+            left: '50%',
+            transform: 'translate(-50%, -50%)',
+            background: 'white',
+            borderRadius: '12px',
+            padding: '24px',
+            boxShadow: '0 10px 40px rgba(0,0,0,0.3)',
+            zIndex: 10001,
+            fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
+            color: '#1a1a1a',
+            maxWidth: '400px',
+            textAlign: 'left'
+        });
+
+        let alertContent = `
+            <h3 style="margin: 0 0 16px 0; font-size: 18px; color: #dc2626; text-align: center;">
+                <i class="fas fa-exclamation-triangle"></i> Safari互換性の問題
+            </h3>
+        `;
+
+        if (compatibilityResult.issues.length > 0) {
+            alertContent += `
+                <p style="margin: 0 0 12px 0; font-size: 14px; color: #374151; font-weight: bold;">
+                    以下の機能がSafariでサポートされていません：
+                </p>
+                <ul style="margin: 0 0 16px 0; padding-left: 20px; font-size: 13px; color: #6b7280;">
+            `;
+            compatibilityResult.issues.forEach(issue => {
+                alertContent += `<li>${issue}</li>`;
+            });
+            alertContent += `</ul>`;
+        }
+
+        if (compatibilityResult.warnings.length > 0) {
+            alertContent += `
+                <p style="margin: 0 0 12px 0; font-size: 14px; color: #f59e0b; font-weight: bold;">
+                    制限事項：
+                </p>
+                <ul style="margin: 0 0 16px 0; padding-left: 20px; font-size: 13px; color: #6b7280;">
+            `;
+            compatibilityResult.warnings.forEach(warning => {
+                alertContent += `<li>${warning}</li>`;
+            });
+            alertContent += `</ul>`;
+        }
+
+        alertContent += `
+            <div style="background: #f3f4f6; padding: 12px; border-radius: 8px; margin: 16px 0; font-size: 13px; color: #6b7280;">
+                <strong>推奨環境：</strong><br>
+                • Chrome、Firefox、Edge などの最新ブラウザ<br>
+                • iOS/iPadOS の場合：写真アプリから画像をアップロード
+            </div>
+            <div style="text-align: center; margin-top: 20px;">
+                <button id="safari-alert-continue" style="
+                    background: #3b82f6;
+                    color: white;
+                    border: none;
+                    padding: 10px 20px;
+                    border-radius: 8px;
+                    cursor: pointer;
+                    font-size: 14px;
+                    font-weight: 500;
+                    margin-right: 8px;
+                ">制限を理解して続行</button>
+                <button id="safari-alert-close" style="
+                    background: #6b7280;
+                    color: white;
+                    border: none;
+                    padding: 10px 20px;
+                    border-radius: 8px;
+                    cursor: pointer;
+                    font-size: 14px;
+                    font-weight: 500;
+                ">閉じる</button>
+            </div>
+        `;
+
+        alertDiv.innerHTML = alertContent;
+        document.body.appendChild(alertDiv);
+
+        // ボタンイベント
+        const continueBtn = alertDiv.querySelector('#safari-alert-continue');
+        const closeBtn = alertDiv.querySelector('#safari-alert-close');
+        
+        continueBtn.addEventListener('click', () => {
+            alertDiv.remove();
+            // localStorage に Safari 警告を表示済みフラグを設定
+            localStorage.setItem('safariWarningShown', 'true');
+        });
+
+        closeBtn.addEventListener('click', () => {
+            alertDiv.remove();
+            localStorage.setItem('safariWarningShown', 'true');
+        });
+
+        // 10秒後に自動で閉じる
+        setTimeout(() => {
+            if (alertDiv.parentNode) {
+                alertDiv.remove();
+                localStorage.setItem('safariWarningShown', 'true');
+            }
+        }, 15000);
+    }
+
+    // ページ読み込み時にSafari互換性をチェック
+    window.addEventListener('load', () => {
+        if (isSafari() && !localStorage.getItem('safariWarningShown')) {
+            const compatibilityResult = checkSafariCompatibility();
+            if (!compatibilityResult.compatible || compatibilityResult.warnings.length > 0) {
+                // 少し遅らせて表示（他の初期化が完了してから）
+                setTimeout(() => {
+                    showSafariCompatibilityAlert(compatibilityResult);
+                }, 1000);
+            }
+        }
+    });
 
     // iOS用のアラートメッセージを表示
     function showIOSCaptureAlert() {
@@ -227,7 +404,7 @@
                 canvas.style.pointerEvents = 'none';
                 
                 // パスが閉じているかチェック（複数の方法で判定）
-                if (currentPath.length > 100) { // 最低限の長さをさらに緩和
+                if (currentPath.length > 20) { // より実用的な長さに調整
                     const isClosedShape = checkIfShapeIsClosed(currentPath);
                     
                     console.log('マーカー検出:', {
@@ -253,8 +430,8 @@
                     }
                 } else {
                     console.log('パスが短すぎます。長さ:', currentPath.length);
-                    // パスが短すぎる場合は赤い線をクリア
-                    clearMarkerWithFeedback(ctx, canvas, `パスが短すぎます (${currentPath.length}点)`);
+                    // パスが短すぎる場合は赤い線をクリアして通常の右クリックメニューを表示
+                    ctx.clearRect(0, 0, canvas.width, canvas.height);
                     // 通常の右クリックメニューを表示
                     shouldShowContextMenu = true;
                     // 右クリックイベントを再発火してメニューを表示
@@ -605,7 +782,7 @@
     // 形状が閉じているかを複数の方法で判定する関数（強化版）
     function checkIfShapeIsClosed(path) {
         console.log('パスの長さ:', path.length); 
-        if (path.length < 5) {
+        if (path.length < 3) {
             return {
                 isClosed: false,
                 method: 'none',
@@ -1633,8 +1810,8 @@
 
     // スクリーンキャプチャ付きでAIチャットを開く関数
     async function openAIWithScreenshot() {
-        // iOS の場合は代替手段を提案してチャットを開く
-        if (isIOS()) {
+        // iOS/Safari の場合は代替手段を提案してチャットを開く
+        if (isIOS() || isSafari()) {
             createAIChat();
             setTimeout(() => {
                 const chatMessages = document.getElementById('chat-messages');
@@ -1652,8 +1829,41 @@
                         margin: '6px auto',
                         border: '1px solid #fed7aa'
                     });
-                    infoMsg.innerHTML = `<i class="fas fa-mobile-alt"></i> iOS: <i class="fas fa-paperclip"></i>ボタンから画像をアップロード`;
+                    
+                    if (isIOS()) {
+                        infoMsg.innerHTML = `<i class="fas fa-mobile-alt"></i> iOS: <i class="fas fa-paperclip"></i>ボタンから画像をアップロード`;
+                    } else {
+                        infoMsg.innerHTML = `<i class="fas fa-safari"></i> Safari: 画面キャプチャが制限されています。<i class="fas fa-paperclip"></i>ボタンから画像をアップロード`;
+                    }
+                    
                     chatMessages.appendChild(infoMsg);
+                    chatMessages.scrollTop = chatMessages.scrollHeight;
+                }
+            }, 100);
+            return;
+        }
+        
+        // Screen Capture API の対応チェック
+        if (!navigator.mediaDevices || !navigator.mediaDevices.getDisplayMedia) {
+            createAIChat();
+            setTimeout(() => {
+                const chatMessages = document.getElementById('chat-messages');
+                if (chatMessages) {
+                    const errorMsg = document.createElement('div');
+                    Object.assign(errorMsg.style, {
+                        background: '#fef2f2',
+                        padding: '10px 14px',
+                        borderRadius: '12px',
+                        maxWidth: '75%',
+                        alignSelf: 'center',
+                        fontSize: '12px',
+                        color: '#dc2626',
+                        textAlign: 'center',
+                        margin: '6px auto',
+                        border: '1px solid #fecaca'
+                    });
+                    errorMsg.innerHTML = '<i class="fas fa-exclamation-triangle"></i> お使いのブラウザは画面キャプチャに対応していません';
+                    chatMessages.appendChild(errorMsg);
                     chatMessages.scrollTop = chatMessages.scrollHeight;
                 }
             }, 100);
@@ -1716,21 +1926,33 @@
             setTimeout(() => {
                 const chatMessages = document.getElementById('chat-messages');
                 if (chatMessages) {
-                    const infoMsg = document.createElement('div');
-                    Object.assign(infoMsg.style, {
-                        background: '#f3f4f6',
+                    const errorMsg = document.createElement('div');
+                    Object.assign(errorMsg.style, {
+                        background: '#fef2f2',
                         padding: '10px 14px',
                         borderRadius: '12px',
                         maxWidth: '75%',
                         alignSelf: 'center',
                         fontSize: '12px',
-                        color: '#6b7280',
+                        color: '#dc2626',
                         textAlign: 'center',
                         margin: '6px auto',
-                        border: '1px solid #e5e7eb'
+                        border: '1px solid #fecaca'
                     });
-                    infoMsg.innerHTML = '<i class="fas fa-info-circle"></i> 通常チャットモードで開始しました';
-                    chatMessages.appendChild(infoMsg);
+                    
+                    let errorMessage = '<i class="fas fa-exclamation-triangle"></i> ';
+                    if (error.name === 'NotAllowedError') {
+                        errorMessage += '画面キャプチャが拒否されました。通常チャットで開始します';
+                    } else if (error.name === 'NotSupportedError') {
+                        errorMessage += 'お使いのブラウザは画面キャプチャに対応していません';
+                    } else if (isSafari()) {
+                        errorMessage += 'Safari: 画面キャプチャが制限されています。<i class="fas fa-paperclip"></i>ボタンから画像をアップロード';
+                    } else {
+                        errorMessage += '画面キャプチャでエラーが発生しました。通常チャットで開始します';
+                    }
+                    
+                    errorMsg.innerHTML = errorMessage;
+                    chatMessages.appendChild(errorMsg);
                     chatMessages.scrollTop = chatMessages.scrollHeight;
                 }
             }, 100);
@@ -2508,7 +2730,21 @@
                 console.log('使用するマイクデバイス:', selectedDeviceId || 'デフォルト');
                 
                 localStream = await navigator.mediaDevices.getUserMedia(audioConstraints);
-                mediaRecorder = new MediaRecorder(localStream, { mimeType: 'audio/webm' });
+                
+                // Safari用のMediaRecorder対応チェック
+                let mimeType = 'audio/webm';
+                if (isSafari() && !MediaRecorder.isTypeSupported('audio/webm')) {
+                    if (MediaRecorder.isTypeSupported('audio/mp4')) {
+                        mimeType = 'audio/mp4';
+                    } else if (MediaRecorder.isTypeSupported('audio/wav')) {
+                        mimeType = 'audio/wav';
+                    } else {
+                        mimeType = ''; // デフォルト形式を使用
+                    }
+                    console.warn(`Safari: WebM形式が未対応のため、${mimeType || 'デフォルト形式'}を使用します`);
+                }
+                
+                mediaRecorder = new MediaRecorder(localStream, mimeType ? { mimeType } : {});
                 mediaRecorder.ondataavailable = (event) => {
                     if (event.data.size > 0) recordedChunks.push(event.data);
                 };
@@ -2602,6 +2838,7 @@
     }
   </script>
   <script src="assets/js/iframe-proxy.js"></script>
+  <script src="assets/js/tutorial.js"></script>
 </body>
 
 </html>
