@@ -6,7 +6,7 @@
   <meta name="referrer" content="no-referrer" />
   <meta http-equiv="X-Content-Type-Options" content="nosniff" />
   <meta http-equiv="Content-Security-Policy" content="">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
   <title id="t">StudyAI</title>
   <link rel="stylesheet" href="assets/css/main.css">
     <link rel="manifest" href="manifest.json">
@@ -34,8 +34,8 @@
     </div>
   </div>
 
-  <script src="./assets/mathematics/bundle.js?v=2025-06-01"></script>
-  <script src="./assets/mathematics/config.js?v=2025-06-01"></script>
+  <script src="./assets/mathematics/bundle.js?v=2025-06-17"></script>
+  <script src="./assets/mathematics/config.js?v=2025-06-17"></script>
   <script src="https://cdn.jsdelivr.net/npm/winbox@0.2.82/dist/winbox.bundle.min.js"></script>
   <link href="https://cdn.jsdelivr.net/npm/winbox@0.2.82/dist/css/winbox.min.css" rel="stylesheet">
   <script src="https://cdn.jsdelivr.net/npm/marked@15.0.12/marked.min.js"></script>
@@ -73,35 +73,31 @@
       }
     };
 
-    // 初回アクセス時にリロード処理を追加
-    if (localStorage.getItem('firstLoadDone') === null) {
-      localStorage.setItem('firstLoadDone', 'true');
-      console.log('First load detected, reloading page for Service Worker activation.');
-      window.location.reload();
-    } else {
-      // Service Workerをiframeプロキシ用に登録
-      if ('serviceWorker' in navigator) {
-        window.addEventListener('load', () => {
-          navigator.serviceWorker.register('./sw.js?v=2025-06-01', {
-            scope: '/'
-          }).then((registration) => {
-            console.log('Service Worker registered for iframe proxy:', registration);
-          }).catch((error) => {
-            console.error('Service Worker registration failed:', error);
-            
-            // Safariで Service Worker 登録が失敗した場合の警告
-            if (isSafari()) {
-              console.warn('Safari: Service Worker の登録に失敗しました。一部機能が制限される可能性があります。');
-            }
-          });
+    // Service Workerを登録し、初回アクセス時に必要であればリロード
+    if ('serviceWorker' in navigator) {
+      window.addEventListener('load', () => {
+        navigator.serviceWorker.register('./sw.js?v=2025-06-01', {
+          scope: '/'
+        }).then(registration => {
+          console.log('Service Worker registered:', registration);
+          // SWがこのページをコントロールしておらず、まだこのセッションでリロードしていない場合にリロード
+          if (!navigator.serviceWorker.controller && !sessionStorage.getItem('sw_reloaded')) {
+            console.log('Service Worker is not yet in control, reloading page to activate.');
+            sessionStorage.setItem('sw_reloaded', 'true');
+            window.location.reload();
+          }
+        }).catch(error => {
+          console.error('Service Worker registration failed:', error);
+          if (isSafari()) {
+            console.warn('Safari: Service Worker の登録に失敗しました。一部機能が制限される可能性があります。');
+          }
         });
-      } else {
-        // Service Worker が対応していない場合の警告
-        console.warn('このブラウザはService Workerに対応していません。一部機能が制限されます。');
-        
-        if (isSafari()) {
-          console.warn('Safari: Service Worker機能が利用できません。');
-        }
+      });
+    } else {
+      // Service Worker が対応していない場合の警告
+      console.warn('このブラウザはService Workerに対応していません。一部機能が制限されます。');
+      if (isSafari()) {
+        console.warn('Safari: Service Worker機能が利用できません。');
       }
     }
     // モバイル端末検出関数

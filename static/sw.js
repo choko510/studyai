@@ -65,15 +65,15 @@ self.addEventListener("fetch", event => {
             try {
               const html = await response.text();
               return new Response(html, {
-                status: response.status,
-                statusText: response.statusText,
+                status: response.status || 200,
+                statusText: response.statusText || 'OK',
                 headers: newHeaders
               });
             } catch (htmlError) {
               console.log('HTML processing failed, returning original response');
               return new Response(response.body, {
-                status: response.status,
-                statusText: response.statusText,
+                status: response.status || 200,
+                statusText: response.statusText || 'OK',
                 headers: newHeaders
               });
             }
@@ -81,8 +81,8 @@ self.addEventListener("fetch", event => {
           
           // HTML以外はヘッダー修正のみで返す
           return new Response(response.body, {
-            status: response.status,
-            statusText: response.statusText,
+            status: response.status || 200,
+            statusText: response.statusText || 'OK',
             headers: newHeaders
           });
           

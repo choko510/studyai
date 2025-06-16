@@ -195,8 +195,8 @@ class UVServiceWorker extends EventEmitter {
           ? u.returnValue
           : new Response(c.body, {
               headers: c.headers,
-              status: c.status,
-              statusText: c.statusText,
+              status: c.status || 200,
+              statusText: c.statusText || 'OK',
             })
       );
     } catch (e) {
@@ -241,8 +241,8 @@ class ResponseContext {
       (this.raw = t),
       (this.ultraviolet = e.ultraviolet),
       (this.headers = n),
-      (this.status = s),
-      (this.statusText = i),
+      (this.status = s || 200),
+      (this.statusText = i || 'OK'),
       (this.body = o);
   }
   get url() {
