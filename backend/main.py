@@ -8,7 +8,7 @@ import os
 from PIL import Image
 import aiohttp
 import google.generativeai as genai
-from voicevox import voicevox_tts
+from backend.voicevox import voicevox_tts
 from dotenv import load_dotenv
 import json
 from typing import Dict, List, Optional
@@ -145,27 +145,11 @@ def validate_speed(speed: float) -> float:
     return max(0.5, min(2.0, speed)) if isinstance(speed, (int, float)) else 1.0
 
 # Gemini APIキーの設定（環境変数から取得）
-gemini_api_key = os.getenv("GEMINI_APIKEY")
+gemini_api_key = os.getenv("GEMINI_API_KEY")
 if gemini_api_key:
     genai.configure(api_key=gemini_api_key)
 else:
-    logging.warning("GEMINI_APIKEY環境変数が設定されていません")
-
-# HTMLファイルを読み込む
-try:
-    with open("index.html", "r", encoding="utf-8") as f:
-        html_content = f.read()
-except FileNotFoundError:
-    logging.error("index.htmlが見つかりません。main.pyと同じディレクトリに配置してください。")
-    html_content = "<html><body><h1>Error: index.html not found.</h1></body></html>"
-
-@app.get("/")
-async def get_root():
-    """
-    ルートURLにアクセスがあった場合に、HTMLコンテンツを返すエンドポイント
-    """
-    return HTMLResponse(content=html_content)
-
+    logging.warning("GEMINI_API_KEY環境変数が設定されていません")
 
 @app.websocket("/ws")
 async def websocket_endpoint(websocket: WebSocket):

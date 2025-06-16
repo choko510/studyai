@@ -4,3 +4,9 @@ node_modules
 .hintrc
 .gitpod.yml 
 .env
+.vscode
+.venv
+*.log
+__pycache__
+cache
+conversation_history

@@ -570,13 +570,13 @@
             <div style="margin-bottom: 20px;">
                 <div style="font-size: 48px; margin-bottom: 16px;">🌐</div>
                 <h3 style="margin: 0 0 16px 0; font-size: 22px; color: #1e40af; font-weight: 600;">
-                    より良い体験のために
+                    Safariはバグります
                 </h3>
             </div>
             
             <div style="text-align: left; margin-bottom: 24px;">
                 <p style="margin: 0 0 16px 0; font-size: 16px; color: #374151; line-height: 1.6;">
-                    <strong>MacOSでSafariをご利用中ですね！</strong>
+                    <strong>MacOSでSafariをご利用中です</strong>
                 </p>
                 <p style="margin: 0 0 20px 0; font-size: 14px; color: #6b7280; line-height: 1.5;">
                     StudyAIの全機能を最大限に活用するため、<strong style="color: #1e40af;">Google Chrome</strong>のご利用をお勧めします。
@@ -587,10 +587,8 @@
                         <i class="fas fa-star"></i> Chromeで利用できる追加機能：
                     </h4>
                     <ul style="margin: 0; padding-left: 20px; font-size: 13px; color: #374151; line-height: 1.4;">
-                        <li>リアルタイム画面キャプチャ</li>
-                        <li>高度な音声録音機能</li>
-                        <li>Service Worker による高速化</li>
-                        <li>WebRTC完全対応</li>
+                        <li>Googleの文字化けからの解放</li>
+                        <li>音声機能</li>
                     </ul>
                 </div>
             </div>
@@ -3060,7 +3058,7 @@
         const microphoneSelect = container.querySelector('#microphoneSelect');
         const refreshMicsButton = container.querySelector('#refreshMicsButton');
 
-        // WebSocketのURLを動的に生成
+        // WebSocketのURLを動的に生成（Node.jsサーバー経由で中継）
         const proto = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
         const WEBSOCKET_URL = `${proto}//${window.location.host}/voice/ws`;
 

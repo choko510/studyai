@@ -11,6 +11,7 @@ import mime from "mime";
 import fetch from "node-fetch";
 import multer from "multer";
 import { GoogleGenerativeAI } from "@google/generative-ai";
+import WebSocket, { WebSocketServer } from 'ws';
 import config from "./config.js";
 
 console.log(chalk.yellow("🚀 Starting server..."));
@@ -18,18 +19,51 @@ console.log(chalk.yellow("🚀 Starting server..."));
 const __dirname = process.cwd();
 const server = http.createServer();
 const app = express();
+
+// Express最適化設定
+app.set('trust proxy', 1);
+app.set('x-powered-by', false);
+
 const bareServer = createBareServer("/ca/");
 const PORT = process.env.PORT || 8080;
 const PYTHON_BACKEND_URL = process.env.PYTHON_BACKEND_URL || 'http://localhost:8000';
+
+// WebSocket中継サーバー設定
+const PYTHON_WS_URL = process.env.PYTHON_WS_URL || 'ws://localhost:8000';
+// キャッシュサイズ制限を追加してメモリリークを防止
 const cache = new Map();
 const CACHE_TTL = 30 * 24 * 60 * 60 * 1000; // Cache for 30 Days
+const MAX_CACHE_SIZE = 1000; // 最大キャッシュエントリ数
+
+// LRU的なキャッシュクリーンアップ
+const cleanupCache = () => {
+  if (cache.size > MAX_CACHE_SIZE) {
+    const entries = Array.from(cache.entries());
+    entries.sort((a, b) => a[1].timestamp - b[1].timestamp);
+    const deleteCount = cache.size - Math.floor(MAX_CACHE_SIZE * 0.8);
+    
+    for (let i = 0; i < deleteCount; i++) {
+      cache.delete(entries[i][0]);
+    }
+    console.log(`キャッシュから${deleteCount}個のエントリを削除しました`);
+  }
+};
 
 // 会話履歴を管理するMap（セッションID -> 会話履歴）
 const conversationHistory = new Map();
 const CONVERSATION_TTL = 24 * 60 * 60 * 1000; // 24時間でセッション削除
 
-// Gemini AI の初期化
+// Gemini AI の初期化（接続プール最適化）
 const genAI = new GoogleGenerativeAI(config.geminiApiKey);
+
+// モデルインスタンスをキャッシュして再利用
+const modelCache = new Map();
+const getModel = (modelName = "gemini-2.0-flash") => {
+  if (!modelCache.has(modelName)) {
+    modelCache.set(modelName, genAI.getGenerativeModel({ model: modelName }));
+  }
+  return modelCache.get(modelName);
+};
 
 // 会話履歴管理のヘルパー関数
 function getConversationHistory(sessionId) {
@@ -45,13 +79,10 @@ function getConversationHistory(sessionId) {
   return session.messages;
 }
 
+// 最適化：オブジェクト作成を減らし、配列操作を効率化
 function addToConversationHistory(sessionId, role, content, imageData = null) {
   const messages = getConversationHistory(sessionId);
-  const message = {
-    role: role, // 'user' または 'model'
-    content: content,
-    timestamp: Date.now()
-  };
+  const message = { role, content, timestamp: Date.now() };
   
   if (imageData) {
     message.imageData = imageData;
@@ -59,64 +90,67 @@ function addToConversationHistory(sessionId, role, content, imageData = null) {
   
   messages.push(message);
   
-  // 履歴が長くなりすぎないように制限（最新20件を保持）
-  if (messages.length > 20) {
-    messages.splice(0, messages.length - 20);
+  // 履歴が長くなりすぎないように制限（最新20件を保持）- 効率的な削除
+  const excess = messages.length - 20;
+  if (excess > 0) {
+    messages.splice(0, excess);
   }
 }
 
+// 最適化：オブジェクト作成を減らし、配列操作を高速化
 function buildConversationContext(sessionId, currentMessage, imageData = null) {
   const history = getConversationHistory(sessionId);
-  const context = [];
+  const contextLength = history.length + 1;
+  const context = new Array(contextLength);
+  let index = 0;
   
-  // 過去の会話履歴を追加
-  history.forEach(msg => {
+  // 過去の会話履歴を追加（最適化：forEach避けてfor文使用）
+  for (let i = 0; i < history.length; i++) {
+    const msg = history[i];
     if (msg.role === 'user') {
-      if (msg.imageData) {
-        context.push({
-          role: 'user',
-          parts: [msg.content, msg.imageData]
-        });
-      } else {
-        context.push({
-          role: 'user',
-          parts: [msg.content]
-        });
-      }
+      context[index++] = {
+        role: 'user',
+        parts: msg.imageData ? [msg.content, msg.imageData] : [msg.content]
+      };
     } else if (msg.role === 'model') {
-      context.push({
+      context[index++] = {
         role: 'model',
         parts: [msg.content]
-      });
+      };
     }
-  });
+  }
   
   // 現在のメッセージを追加
-  if (imageData) {
-    context.push({
-      role: 'user',
-      parts: [currentMessage, imageData]
-    });
-  } else {
-    context.push({
-      role: 'user',
-      parts: [currentMessage]
-    });
-  }
+  context[index] = {
+    role: 'user',
+    parts: imageData ? [currentMessage, imageData] : [currentMessage]
+  };
   
-  return context;
+  return context.slice(0, index + 1);
 }
 
-// 古い会話セッションを定期的に削除
-setInterval(() => {
+// 古い会話セッションを定期的に削除（最適化：バッチ処理）
+const cleanupSessions = () => {
   const now = Date.now();
+  const expiredSessions = [];
+  
   for (const [sessionId, session] of conversationHistory.entries()) {
     if (now - session.lastAccessed > CONVERSATION_TTL) {
-      conversationHistory.delete(sessionId);
-      console.log(`セッション ${sessionId} を削除しました`);
+      expiredSessions.push(sessionId);
     }
   }
-}, 60 * 60 * 1000); // 1時間ごとにチェック
+  
+  expiredSessions.forEach(sessionId => {
+    conversationHistory.delete(sessionId);
+    console.log(`セッション ${sessionId} を削除しました`);
+  });
+  
+  if (expiredSessions.length > 0) {
+    console.log(`${expiredSessions.length}個のセッションを削除しました`);
+  }
+};
+
+setInterval(cleanupSessions, 60 * 60 * 1000); // 1時間ごとにチェック
 
 // Multer の設定（メモリに画像を保存）
 const upload = multer({
@@ -135,22 +169,35 @@ if (config.challenge !== false) {
   console.log(
     chalk.green("🔒 Password protection is enabled! Listing logins below"),
   );
-  // biome-ignore lint/complexity/noForEach:
-  Object.entries(config.users).forEach(([username, password]) => {
-    console.log(chalk.blue(`Username: ${username}, Password: ${password}`));
-  });
-  app.use(basicAuth({ users: config.users, challenge: true }));
+  // 最適化：Object.entriesの代わりにfor...inを使用
+  for (const username in config.users) {
+    console.log(chalk.blue(`Username: ${username}, Password: ${config.users[username]}`));
+  }
+  
+  // Basic認証の最適化設定
+  app.use(basicAuth({
+    users: config.users,
+    challenge: true,
+    realm: 'StudyAI',
+    unauthorizedResponse: () => 'Unauthorized'
+  }));
 }
 
 app.get("/e/*", async (req, res, next) => {
   try {
-    if (cache.has(req.path)) {
-      const { data, contentType, timestamp } = cache.get(req.path);
-      if (Date.now() - timestamp > CACHE_TTL) {
+    // キャッシュチェック最適化
+    const cached = cache.get(req.path);
+    if (cached) {
+      const now = Date.now();
+      if (now - cached.timestamp > CACHE_TTL) {
         cache.delete(req.path);
       } else {
-        res.writeHead(200, { "Content-Type": contentType });
-        return res.end(data);
+        res.writeHead(200, {
+          "Content-Type": cached.contentType,
+          "Cache-Control": "public, max-age=86400", // 1日キャッシュ
+          "Last-Modified": new Date(cached.timestamp).toUTCString()
+        });
+        return res.end(cached.data);
       }
     }
 
@@ -172,6 +219,7 @@ app.get("/e/*", async (req, res, next) => {
       return next();
     }
 
+    const asset = await fetch(reqTarget);
     if (!asset.ok) {
       return next();
     }
@@ -183,6 +231,11 @@ app.get("/e/*", async (req, res, next) => {
       ? "application/octet-stream"
       : mime.getType(ext);
 
+    // キャッシュサイズチェックしてから追加
+    if (cache.size >= MAX_CACHE_SIZE) {
+      cleanupCache();
+    }
+    
     cache.set(req.path, { data, contentType, timestamp: Date.now() });
     res.writeHead(200, { "Content-Type": contentType });
     res.end(data);
@@ -193,11 +246,35 @@ app.get("/e/*", async (req, res, next) => {
   }
 });
 
+// ミドルウェア最適化：JSONペイロードサイズ制限とパフォーマンス向上
 app.use(cookieParser());
-app.use(express.json());
-app.use(express.urlencoded({ extended: true }));
+app.use(express.json({
+  limit: '10mb',
+  strict: true,
+  reviver: null // JSONパースを高速化
+}));
+app.use(express.urlencoded({
+  extended: true,
+  limit: '10mb',
+  parameterLimit: 1000
+}));
 
-app.use(express.static(path.join(__dirname, "static")));
+// 静的ファイル配信最適化
+app.use(express.static(path.join(__dirname, "static"), {
+  maxAge: '1d', // キャッシュを1日に設定
+  etag: true,
+  lastModified: true,
+  setHeaders: (res, path) => {
+    // JS/CSSファイルは長期キャッシュ
+    if (path.endsWith('.js') || path.endsWith('.css')) {
+      res.setHeader('Cache-Control', 'public, max-age=604800'); // 1週間
+    }
+    // 画像ファイルも長期キャッシュ
+    if (path.match(/\.(jpg|jpeg|png|gif|ico|svg)$/)) {
+      res.setHeader('Cache-Control', 'public, max-age=2592000'); // 1ヶ月
+    }
+  }
+}));
 app.use("/ca", cors({ origin: true }));
 
 // API エンドポイント
@@ -211,8 +288,8 @@ app.post("/api/aireq", upload.single('image'), async (req, res) => {
       return res.status(400).json({ error: "画像ファイルが必要です" });
     }
 
-    // セッションIDの取得（なければ生成）
-    const sessionId = req.body.sessionId || `session_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+    // セッションIDの取得（なければ生成）- 高速化
+    const sessionId = req.body.sessionId || `session_${Date.now()}_${Math.random().toString(36).substring(2, 11)}`;
 
     // プロンプトの取得（オプション）
     const userPrompt = req.body.prompt || "この画像に写っている問題や質問を教えてください。";
@@ -255,7 +332,7 @@ app.post("/api/aireq", upload.single('image'), async (req, res) => {
     // 会話履歴を含むコンテキストを構築
     const conversationContext = buildConversationContext(sessionId, systemPrompt + "\n\nユーザーの質問: " + userPrompt, imageData);
 
-    const model = genAI.getGenerativeModel({ model: "gemini-2.0-flash" });
+    const model = getModel("gemini-2.0-flash");
 
     // ストリーミングで生成開始（会話履歴を含む）
     const chat = model.startChat({
@@ -270,13 +347,25 @@ app.post("/api/aireq", upload.single('image'), async (req, res) => {
     // セッションIDを最初に送信
     res.write(JSON.stringify({ type: 'sessionId', sessionId }) + '\n');
 
-    // ストリーミングレスポンスを処理
+    // ストリーミングレスポンスを処理（バッファリング最適化）
+    const chunks = [];
     for await (const chunk of result.stream) {
       const chunkText = chunk.text();
       if (chunkText) {
         fullResponse += chunkText;
-        res.write(JSON.stringify({ type: 'content', content: chunkText }) + '\n');
+        chunks.push(JSON.stringify({ type: 'content', content: chunkText }) + '\n');
+        
+        // バッファが一定サイズになったら送信
+        if (chunks.length >= 3) {
+          res.write(chunks.join(''));
+          chunks.length = 0;
+        }
       }
+    }
+    
+    // 残りのチャンクを送信
+    if (chunks.length > 0) {
+      res.write(chunks.join(''));
     }
 
     // 会話履歴に追加
@@ -316,8 +405,8 @@ app.post("/api/text", async (req, res) => {
       return res.status(400).json({ error: "メッセージは2000文字以下である必要があります" });
     }
 
-    // セッションIDの取得（なければ生成）
-    const sessionId = clientSessionId || `session_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+    // セッションIDの取得（なければ生成）- 高速化
+    const sessionId = clientSessionId || `session_${Date.now()}_${Math.random().toString(36).substring(2, 11)}`;
 
     // ストリーミングレスポンスのヘッダー設定
     res.setHeader('Content-Type', 'application/json; charset=utf-8');
@@ -345,8 +434,8 @@ app.post("/api/text", async (req, res) => {
     // 会話履歴を含むコンテキストを構築
     const conversationContext = buildConversationContext(sessionId, systemPrompt + "\n\nユーザーの質問: " + message);
 
-    // Gemini Pro モデルを取得
-    const model = genAI.getGenerativeModel({ model: "gemini-2.0-flash" });
+    // Gemini Pro モデルを取得（キャッシュ済み）
+    const model = getModel("gemini-2.0-flash");
 
     // 会話履歴がある場合はチャット形式、ない場合は単発
     let result;
@@ -366,13 +455,25 @@ app.post("/api/text", async (req, res) => {
     // セッションIDを最初に送信
     res.write(JSON.stringify({ type: 'sessionId', sessionId }) + '\n');
 
-    // ストリーミングレスポンスを処理
+    // ストリーミングレスポンスを処理（バッファリング最適化）
+    const chunks = [];
     for await (const chunk of result.stream) {
       const chunkText = chunk.text();
       if (chunkText) {
         fullResponse += chunkText;
-        res.write(JSON.stringify({ type: 'content', content: chunkText }) + '\n');
+        chunks.push(JSON.stringify({ type: 'content', content: chunkText }) + '\n');
+        
+        // バッファが一定サイズになったら送信
+        if (chunks.length >= 3) {
+          res.write(chunks.join(''));
+          chunks.length = 0;
+        }
       }
+    }
+    
+    // 残りのチャンクを送信
+    if (chunks.length > 0) {
+      res.write(chunks.join(''));
     }
 
     // 会話履歴に追加
@@ -399,6 +500,15 @@ app.post("/api/text", async (req, res) => {
   }
 });
 
+// Backend設定取得API
+app.get("/api/config", (req, res) => {
+  res.json({
+    pythonBackendUrl: PYTHON_BACKEND_URL,
+    pythonWsUrl: PYTHON_WS_URL,
+    nodeServerPort: PORT
+  });
+});
+
 // API エラーハンドリング
 app.use("/api/*", (req, res) => {
   console.log(chalk.red(`🚫 404 Not Found: ${req.method} ${req.path}`));
@@ -408,7 +518,8 @@ app.use("/api/*", (req, res) => {
     method: req.method,
     availableEndpoints: [
       "POST /api/aireq - 画像解析（画像ファイルとオプションのプロンプトを送信）",
-      "POST /api/text - テキストのみの質問（JSONで{\"message\": \"質問内容\"}を送信）"
+      "POST /api/text - テキストのみの質問（JSONで{\"message\": \"質問内容\"}を送信）",
+      "GET /api/config - Backend設定情報を取得"
     ]
   });
 });
@@ -447,13 +558,107 @@ server.on("request", (req, res) => {
 server.on("upgrade", (req, socket, head) => {
   if (bareServer.shouldRoute(req)) {
     bareServer.routeUpgrade(req, socket, head);
+  } else if (req.url === '/voice/ws') {
+    // WebSocket中継機能
+    handleVoiceWebSocketUpgrade(req, socket, head);
   } else {
     socket.end();
   }
+});
+
+// WebSocket中継機能の実装
+function handleVoiceWebSocketUpgrade(req, socket, head) {
+  try {
+    console.log(chalk.blue(`🎤 Voice WebSocket接続要求: ${req.url}`));
+    
+    // クライアント側のWebSocketサーバーを作成
+    const wss = new WebSocketServer({ noServer: true });
+    
+    wss.handleUpgrade(req, socket, head, (ws) => {
+      console.log(chalk.green('🎤 クライアント WebSocket接続確立'));
+      
+      // PythonバックエンドへのWebSocket接続を作成
+      const backendWsUrl = `${PYTHON_WS_URL}/ws`;
+      console.log(chalk.blue(`🔗 バックエンドに接続中: ${backendWsUrl}`));
+      
+      const backendWs = new WebSocket(backendWsUrl);
+      
+      backendWs.on('open', () => {
+        console.log(chalk.green('🔗 バックエンド WebSocket接続確立'));
+      });
+      
+      backendWs.on('message', (data) => {
+        console.log(chalk.yellow(`📤 バックエンドからクライアントへ: ${data.length} bytes`));
+        if (ws.readyState === WebSocket.OPEN) {
+          ws.send(data);
+        }
+      });
+      
+      backendWs.on('error', (error) => {
+        console.error(chalk.red('❌ バックエンド WebSocketエラー:'), error);
+        if (ws.readyState === WebSocket.OPEN) {
+          ws.close(1011, 'Backend connection error');
+        }
+      });
+      
+      backendWs.on('close', () => {
+        console.log(chalk.yellow('🔌 バックエンド WebSocket切断'));
+        if (ws.readyState === WebSocket.OPEN) {
+          ws.close();
+        }
+      });
+      
+      // クライアントからのメッセージをバックエンドに転送
+      ws.on('message', (data) => {
+        console.log(chalk.cyan(`📥 クライアントからバックエンドへ: ${data.length} bytes`));
+        if (backendWs.readyState === WebSocket.OPEN) {
+          backendWs.send(data);
+        }
+      });
+      
+      ws.on('error', (error) => {
+        console.error(chalk.red('❌ クライアント WebSocketエラー:'), error);
+        if (backendWs.readyState === WebSocket.OPEN) {
+          backendWs.close();
+        }
+      });
+      
+      ws.on('close', () => {
+        console.log(chalk.yellow('🔌 クライアント WebSocket切断'));
+        if (backendWs.readyState === WebSocket.OPEN) {
+          backendWs.close();
+        }
+      });
+    });
+  } catch (error) {
+    console.error(chalk.red('❌ WebSocket中継エラー:'), error);
+    socket.end();
+  }
+}
+
+// プロセス最適化
+process.on('SIGTERM', () => {
+  console.log('SIGTERM received, shutting down gracefully');
+  server.close(() => {
+    console.log('Server closed');
+    process.exit(0);
+  });
+});
+
+process.on('SIGINT', () => {
+  console.log('SIGINT received, shutting down gracefully');
+  server.close(() => {
+    console.log('Server closed');
+    process.exit(0);
+  });
 });
 
 server.on("listening", () => {
   console.log(chalk.green(`🌍 Server is running on http://localhost:${PORT}`));
 });
 
-server.listen({ port: PORT });
+// サーバー設定最適化
+server.listen({
+  port: PORT,
+  backlog: 511  // 接続キューサイズを最適化
+});

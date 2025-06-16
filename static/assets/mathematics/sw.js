@@ -1,6 +1,5 @@
 importScripts("/assets/mathematics/bundle.js?v=9-30-2024"),
   importScripts("/assets/mathematics/config.js?v=9-30-2024");
-
 class UVServiceWorker extends EventEmitter {
   constructor(e = __uv$config) {
     super(),
@@ -101,11 +100,13 @@ class UVServiceWorker extends EventEmitter {
       )
         switch (e.destination) {
           case "script":
-          case "worker":
-            (c.body = `try{if (!self.__uv && self.importScripts){importScripts('${__uv$config.bundle}', '${__uv$config.config}', '${__uv$config.handler}');}}catch(e){import '${__uv$config.bundle}';
-        import '${__uv$config.config}';
-        import '${__uv$config.handler}';}\n`),
-              (c.body += t.js.rewrite(await a.text()));
+            case "worker":
+            if (t.meta.url.href.includes('loilonote.app')) {
+              c.body = `import '${__uv$config.bundle}';\nimport '${__uv$config.config}';\nimport '${__uv$config.handler}';\n`;
+            } else {
+              c.body = `if (!self.__uv && self.importScripts) importScripts('${__uv$config.bundle}', '${__uv$config.config}', '${__uv$config.handler}');\n`;
+            }
+            c.body += t.js.rewrite(await a.text());
             break;
           case "style":
             c.body = t.rewriteCSS(await a.text());

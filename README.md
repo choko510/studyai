@@ -77,6 +77,10 @@ cp .env.example .env
 ```env
 GEMINI_API_KEY=your_gemini_api_key_here
 PORT=8080
+
+# Pythonバックエンド設定（音声機能使用時）
+PYTHON_BACKEND_URL=http://localhost:8000
+PYTHON_WS_URL=ws://localhost:8000
 ```
 
 4. **サーバーの起動**
@@ -181,12 +185,28 @@ const config = {
 **レスポンス:**
 - ストリーミング形式のJSON応答
 
-### WebSocket /ws
-音声データ送信API（VAD音声デモ用）
+### GET /api/config
+バックエンド設定情報取得API
+
+**レスポンス:**
+```json
+{
+  "pythonBackendUrl": "http://localhost:8000",
+  "pythonWsUrl": "ws://localhost:8000",
+  "nodeServerPort": 8080
+}
+```
+
+### WebSocket /voice/ws
+音声データ中継API（VAD音声デモ用）
+
+**機能:**
+- Node.jsサーバーがクライアントとPythonバックエンド間のWebSocket通信を中継
+- リアルタイム音声データの双方向転送
 
 **接続:**
-- WebSocketプロトコルでの接続
-- 音声データ（Blob形式）の送受信
+- クライアント → Node.js (`/voice/ws`)
+- Node.js → Pythonバックエンド (`/ws`)
 
 **送信:**
 - 音声データ（audio/webm形式）
@@ -202,13 +222,18 @@ const config = {
 ```
 ┌─────────────────┐    ┌─────────────────┐    ┌─────────────────┐
 │   フロントエンド   │ ←→ │   Express.js    │ ←→ │   Gemini API    │
-│   (Vanilla JS)   │    │     サーバー      │    │                 │
+│   (Vanilla JS)   │    │   Node サーバー   │    │                 │
 └─────────────────┘    └─────────────────┘    └─────────────────┘
-         ↕                       ↕
-┌─────────────────┐    ┌─────────────────┐
-│   Bare Server   │    │   Static Files  │
-│    (プロキシ)     │    │   (HTML/CSS)    │
-└─────────────────┘    └─────────────────┘
+         ↕                       ↕                       ↕
+┌─────────────────┐    ┌─────────────────┐    ┌─────────────────┐
+│   Bare Server   │    │   Static Files  │    │ Python Backend  │
+│    (プロキシ)     │    │   (HTML/CSS)    │    │   (FastAPI)     │
+└─────────────────┘    └─────────────────┘    └─────────────────┘
+                                ↕                       ↕
+                    ┌─────────────────┐    ┌─────────────────┐
+                    │  WebSocket中継   │    │   音声処理・AI   │
+                    │  (/voice/ws)    │    │  (Whisper/TTS)  │
+                    └─────────────────┘    └─────────────────┘
 ```
 
 ### 使用技術
