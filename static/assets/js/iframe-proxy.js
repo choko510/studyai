@@ -10,8 +10,60 @@ class IframeProxy {
     this.history = [];
     this.currentIndex = -1;
     this.defaultHome = 'https://google.com';
+    this.sessionId = this.generateSessionId();
     
-    // 初期ページを読み込み
+    // セッション復元
+    this.restoreSession();
+    
+    // URL変化の監視を開始
+    this.lastUrl = "";
+    this.startUrlChangeMonitoring();
+  }
+  
+  generateSessionId() {
+    return 'session_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9);
+  }
+  
+  saveSession() {
+    const sessionData = {
+      history: this.history,
+      currentIndex: this.currentIndex,
+      currentUrl: this.urlInput.value,
+      timestamp: Date.now()
+    };
+    localStorage.setItem('proxySession_' + this.sessionId, JSON.stringify(sessionData));
+    localStorage.setItem('currentSessionId', this.sessionId);
+  }
+  
+  restoreSession() {
+    const savedSessionId = localStorage.getItem('currentSessionId');
+    if (savedSessionId) {
+      const sessionData = localStorage.getItem('proxySession_' + savedSessionId);
+      if (sessionData) {
+        try {
+          const data = JSON.parse(sessionData);
+          // セッションが24時間以内のものであることを確認
+          if (Date.now() - data.timestamp < 24 * 60 * 60 * 1000) {
+            this.history = data.history || [];
+            this.currentIndex = data.currentIndex || -1;
+            this.sessionId = savedSessionId;
+            
+            // 前回のURLを復元
+            if (data.currentUrl && data.currentUrl !== this.defaultHome) {
+              setTimeout(() => {
+                this.navigate(data.currentUrl);
+                console.log('セッション復元: ' + data.currentUrl);
+              }, 100);
+              return;
+            }
+          }
+        } catch (error) {
+          console.error('セッション復元エラー:', error);
+        }
+      }
+    }
+    
+    // セッション復元に失敗した場合は初期ページを読み込み
     setTimeout(() => {
       this.navigate(this.defaultHome);
     }, 100);
@@ -30,6 +82,51 @@ class IframeProxy {
       this.onIframeLoad();
     });
     
+    // iframe error監視
+    this.iframe.addEventListener('error', () => {
+      this.onIframeError();
+    });
+  }
+  
+  // iframeのURL変化を監視するメソッド
+  startUrlChangeMonitoring() {
+    setInterval(() => {
+      this.checkIframeUrlChange();
+    }, 500);
+  }
+  
+  checkIframeUrlChange() {
+    try {
+      const currentUrl = this.iframe.contentWindow.location.href;
+      if (currentUrl !== this.lastUrl) {
+        this.lastUrl = currentUrl;
+        console.log("iframe URL changed:", currentUrl);
+        
+        // URLが変化した時にurlInputを更新
+        const realUrl = this.extractRealUrlFromProxy(currentUrl) || currentUrl;
+        if (realUrl && realUrl !== this.urlInput.value) {
+          this.urlInput.value = realUrl;
+          // 履歴も更新
+          if (this.history[this.currentIndex] !== realUrl) {
+            if (this.currentIndex < this.history.length - 1) {
+              this.history = this.history.slice(0, this.currentIndex + 1);
+            }
+            this.history.push(realUrl);
+            this.currentIndex = this.history.length - 1;
+            this.updateNavigationButtons();
+            this.saveSession();
+          }
+          
+          // 囲むモードボタンの表示チェック
+          if (typeof checkAndToggleMarkerButton === 'function') {
+            checkAndToggleMarkerButton();
+          }
+        }
+      }
+    } catch (error) {
+      // 別オリジンだとここでエラーになる
+      console.warn("Cannot access iframe URL due to cross-origin restrictions.");
+    }
   }
   
   navigate(url = null) {
@@ -56,6 +153,9 @@ class IframeProxy {
     
     this.loadUrl(processedUrl);
     this.updateNavigationButtons();
+    
+    // セッションを保存
+    this.saveSession();
   }
   
   processUrl(input) {
@@ -107,6 +207,7 @@ class IframeProxy {
       const url = this.history[this.currentIndex];
       this.loadUrl(url);
       this.updateNavigationButtons();
+      this.saveSession();
     }
   }
   
@@ -116,6 +217,7 @@ class IframeProxy {
       const url = this.history[this.currentIndex];
       this.loadUrl(url);
       this.updateNavigationButtons();
+      this.saveSession();
     }
   }
   

@@ -1,5 +1,6 @@
 import logging
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect
+from fastapi.responses import HTMLResponse
 import uvicorn
 import uuid
 from faster_whisper import WhisperModel
@@ -10,9 +11,8 @@ import google.generativeai as genai
 from voicevox import voicevox_tts
 from dotenv import load_dotenv
 import json
-from typing import Dict, List
+from typing import Dict, List, Optional
 from datetime import datetime
-import asyncio
 
 # 環境変数を読み込み
 load_dotenv()
@@ -26,39 +26,6 @@ app = FastAPI()
 # 必要なディレクトリを作成
 os.makedirs("cache", exist_ok=True)
 os.makedirs("conversation_history", exist_ok=True)
-
-# グローバルなWhisperモデルインスタンス（初回読み込み時間を削減）
-_whisper_model = None
-_whisper_device = None
-_whisper_compute_type = None
-
-def get_whisper_model():
-    """Whisperモデルのシングルトンインスタンスを取得"""
-    global _whisper_model, _whisper_device, _whisper_compute_type
-    
-    if _whisper_model is None:
-        # GPU利用可能性をチェック
-        try:
-            import torch
-            if torch.cuda.is_available():
-                device = "cuda"
-                compute_type = "float16"
-                logging.info("CUDA GPU が利用可能です。GPUを使用して音声認識を実行します。")
-            else:
-                device = "cpu"
-                compute_type = "int8"
-                logging.info("GPU が利用できません。CPUを使用して音声認識を実行します。")
-        except ImportError:
-            device = "cpu"
-            compute_type = "int8"
-            logging.info("PyTorch が見つかりません。CPUを使用して音声認識を実行します。")
-        
-        _whisper_model = WhisperModel("base", device=device, compute_type=compute_type)
-        _whisper_device = device
-        _whisper_compute_type = compute_type
-        logging.info(f"Whisperモデルを初期化しました (デバイス: {device}, compute_type: {compute_type})")
-    
-    return _whisper_model, _whisper_device, _whisper_compute_type
 
 # 会話履歴を保存するクラス
 class ConversationHistory:
@@ -187,7 +154,7 @@ else:
 @app.websocket("/ws")
 async def websocket_endpoint(websocket: WebSocket):
     """
-    WebSocket接続を処理するエンドポイント（高速化版）
+    WebSocket接続を処理するエンドポイント
     """
     await websocket.accept()
     # セッションIDを生成（クライアント固有の識別子）
@@ -196,9 +163,6 @@ async def websocket_endpoint(websocket: WebSocket):
     
     # セッション開始時に過去の会話履歴を読み込み
     conversation_history.load_from_file(session_id)
-    
-    # Whisperモデルを事前に初期化（接続時に一度だけ）
-    get_whisper_model()
     
     try:
         while True:
@@ -210,36 +174,69 @@ async def websocket_endpoint(websocket: WebSocket):
 
             logging.info(f"受信データサイズ: {len(data)} bytes. => {filename} に保存します。")
 
-            # 非同期でファイル書き込み
-            def write_file():
-                with open("cache/"+filename, "wb") as f:
-                    f.write(data)
-            
-            # ファイル書き込みと文字起こしを並列実行
-            loop = asyncio.get_event_loop()
-            await loop.run_in_executor(None, write_file)
+            # 受信した音声データをファイルに書き込み
+            with open("cache/"+filename, "wb") as f:
+                f.write(data)
 
-            # 文字起こし、AI応答生成、音声合成を並列化
-            transcription_task = asyncio.create_task(transcription(filename))
-            
-            # 文字起こし結果を待機
-            text = await transcription_task
+            # 文字起こしを実行
+            text = await transcription(filename)
             logging.info(f"文字起こし完了: {text}")
 
             # 過去の会話履歴を取得
-            history_text = conversation_history.get_history_text(session_id, limit=3)  # 履歴を3件に削減
+            history_text = conversation_history.get_history_text(session_id, limit=5)
 
-            # 簡潔なプロンプトで高速化
-            prompt = f"""あなたはずんだもんです。以下のJSON形式で返答してください：
-            {{"text": "返答メッセージ（〜のだ口調）", "emotion_id": 3, "speed": 1.0}}
+            # AI応答を生成
+            prompt = f"""
+            # 命令
+            あなたは、ユーザーと音声で会話するAIアシスタントです。ユーザーの最新の発言と過去の会話履歴を考慮し、自然な返答を生成してください。
+            そして、その返答内容に最もふさわしい「感情ID」と「話速」を決定し、指定されたJSON形式で出力してください。
 
-            ユーザー: {text}
-            履歴: {history_text}"""
+            # 感情IDリスト
+            ユーザーの発言や、あなたが生成する返答の感情に合わせて、以下のリストから最も適切な`id`を1つだけ選んでください。
+            [
+            {{"name":"ノーマル","id":3}},
+            {{"name":"あまあま","id":1}},
+            {{"name":"ツンツン","id":7}},
+            {{"name":"セクシー","id":5}},
+            {{"name":"ささやき","id":22}},
+            {{"name":"ヒソヒソ","id":38}},
+            {{"name":"ヘロヘロ","id":75}},
+            {{"name":"なみだめ","id":76}}
+            ]
+
+            # 話速(speed)のルール
+            - デフォルトの話速は `1.0` です。
+            - 返答内容に応じて話速を調整してください。
+            - 興奮したり、楽しそうな内容の場合: `1.1` ~ `1.2`
+            - 落ち着かせたり、悲しい内容の場合: `0.8` ~ `0.9`
+            - 通常の会話では `1.0` を使用してください。
+
+            # 語り手の特徴
+            - ずんだ餅の精霊。「ボク」または「ずんだもん」を使う。
+            - 口調は親しみやすく、語尾に「〜のだ」「〜なのだ」を使う。
+            - 明るく元気でフレンドリーな性格。
+            - 難しい話題も簡単に解説する。
+
+            # 出力形式
+            以下のJSON形式で、返答テキスト(`text`)、感情ID(`emotion_id`)、話速(`speed`)の3つのキーを含むオブジェクトを生成してください。
+            JSON以外の余計な説明やテキストは一切含めないでください。
+
+            ```json
+            {{
+            "text": "ここにAIの返答メッセージを生成する",
+            "emotion_id": 3,
+            "speed": 1.0
+            }}
+            ```
+
+            # ユーザーの最新の発言
+            {text}
             
-            # AI応答と音声変換を並列実行するためのタスクを準備
-            ai_task = asyncio.create_task(reqAI(prompt))
+            # 過去の会話履歴
+            {history_text}
+            """
             
-            raw_airesponse = await ai_task
+            raw_airesponse = await reqAI(prompt)
             logging.info(f"AI生応答: {raw_airesponse}")
 
             # JSON解析を実行
@@ -252,29 +249,23 @@ async def websocket_endpoint(websocket: WebSocket):
             
             logging.info(f"解析結果 - テキスト: {ai_text}, 感情ID: {emotion_id}, 話速: {speed}")
 
-            # 会話履歴に追加（非同期）
+            # 会話履歴に追加
             conversation_history.add_message(session_id, text, ai_text, emotion_id, speed)
             
-            # 音声変換と履歴保存を並列実行
-            voice_task = asyncio.create_task(text_to_voice_with_params(ai_text, emotion_id, speed))
-            save_task = asyncio.create_task(asyncio.to_thread(conversation_history.save_to_file, session_id))
-            
+            # 定期的に履歴をファイルに保存
+            conversation_history.save_to_file(session_id)
+
+            # AI応答を音声に変換
             try:
-                voice_data = await voice_task
+                voice_data = await text_to_voice_with_params(ai_text, emotion_id, speed)
                 # 音声データをクライアントに送信
                 await websocket.send_bytes(voice_data)
                 logging.info("音声データをクライアントに送信しました")
-                
-                # 履歴保存の完了を待機（バックグラウンド）
-                await save_task
             except Exception as voice_error:
                 logging.error(f"音声変換エラー: {voice_error}")
                 # エラーの場合はテキストで応答
                 await websocket.send_text(f"応答: {ai_text}")
-                await save_task  # 履歴保存は継続
 
-            # ファイルクリーンアップ（非同期）
-            asyncio.create_task(asyncio.to_thread(cleanup_file, filename))
 
     except WebSocketDisconnect:
         logging.info(f"クライアントが切断しました: {websocket.client}")
@@ -285,15 +276,6 @@ async def websocket_endpoint(websocket: WebSocket):
         # エラー時にも履歴を保存
         conversation_history.save_to_file(session_id)
         await websocket.close(code=1011, reason="Server error")
-
-def cleanup_file(filename: str):
-    """一時ファイルを削除する関数"""
-    try:
-        if os.path.exists("cache/" + filename):
-            os.remove("cache/" + filename)
-            logging.info(f"一時ファイルを削除しました: {filename}")
-    except Exception as e:
-        logging.warning(f"ファイル削除エラー: {e}")
 
 async def transcription(filename: str):
     """ 音声ファイルの文字起こしを行う関数（faster-whisper対応版）

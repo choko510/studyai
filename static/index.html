@@ -19,8 +19,9 @@
         <button class="nav-btn" id="forward-btn" onclick="goForward()" disabled>→</button>
         <button class="nav-btn" id="refresh-btn" onclick="refresh()">⟲</button>
         <button class="nav-btn" id="ai-btn" onclick="openAIWithScreenshot()">AI質問</button>
-        <button class="nav-btn" id="voice-demo-btn" onclick="openVoiceDemo()">音声デモ</button>
+        <button class="nav-btn" id="voice-demo-btn" onclick="openVoiceDemo()">AI通話</button>
         <button class="nav-btn" id="marker-mode-btn" onclick="toggleMarkerMode()" style="display: none;">囲むモード</button>
+        <button class="nav-btn" id="page-split-btn" onclick="openPageSplitMode()" style="display: none;">ページ分割</button>
       </div>
       <input type="text" class="url-input" id="url-input" placeholder="URLまたは検索語句を入力...">
       <button class="go-btn" onclick="navigate()">移動</button>
@@ -373,14 +374,35 @@
         });
     }
 
-    // ページロード時にモバイル端末なら囲むボタンを表示
-    window.addEventListener('load', () => {
-        if (isMobileDevice()) {
-            const markerBtn = document.getElementById('marker-mode-btn');
-            if (markerBtn) {
+    // URL入力欄の値をチェックして囲むボタンとページ分割ボタンの表示を制御する関数
+    function checkAndToggleMarkerButton() {
+        const urlInput = document.getElementById('url-input');
+        const markerBtn = document.getElementById('marker-mode-btn');
+        const pageSplitBtn = document.getElementById('page-split-btn');
+        
+        if (urlInput && markerBtn && pageSplitBtn) {
+            const currentUrl = urlInput.value;
+            if (currentUrl.includes('loilonote.app')) {
                 markerBtn.style.display = 'inline-block';
-                console.log('モバイル端末を検出しました。囲むモードボタンを表示します。');
+                pageSplitBtn.style.display = 'inline-block';
+                console.log('loilonote.appが含まれるURLを検出しました。囲むモードボタンとページ分割ボタンを表示します。');
+            } else {
+                markerBtn.style.display = 'none';
+                pageSplitBtn.style.display = 'none';
+                console.log('loilonote.appが含まれていません。囲むモードボタンとページ分割ボタンを非表示にします。');
             }
+        }
+    }
+
+    // ページロード時とURL変更時に囲むボタンの表示をチェック
+    window.addEventListener('load', () => {
+        checkAndToggleMarkerButton();
+        
+        // URL入力欄の変更を監視
+        const urlInput = document.getElementById('url-input');
+        if (urlInput) {
+            urlInput.addEventListener('input', checkAndToggleMarkerButton);
+            urlInput.addEventListener('change', checkAndToggleMarkerButton);
         }
     });
 
@@ -2920,6 +2942,155 @@
         }
     }
 
+    // ページ分割モード機能（デフォルトでLoiLo通信をブロック）
+    function openPageSplitMode() {
+        const urlInput = document.getElementById('url-input');
+        const currentUrl = urlInput.value.trim();
+        
+        if (!currentUrl) {
+            alert('分割するページが選択されていません。');
+            return;
+        }
+        
+        // デフォルトでLoiLo通信ブロック機能付きでウィンドウを作成
+        createPageSplitWindow(currentUrl);
+    }
+    
+    // ページ分割ウィンドウを作成（デフォルトでLoiLo通信をブロック）
+    function createPageSplitWindow(currentUrl) {
+        // 現在のURLからドメインを抽出してタイトルに使用
+        let pageTitle = 'ページ分割';
+        try {
+            const url = new URL(currentUrl.startsWith('http') ? currentUrl : 'https://' + currentUrl);
+            pageTitle = url.hostname;
+        } catch (e) {
+            pageTitle = currentUrl.length > 20 ? currentUrl.substring(0, 20) + '...' : currentUrl;
+        }
+        
+        // タイトルにブロック状態を表示
+        pageTitle += ' [LoiLo通信ブロック]';
+        
+        // 新しいWinBoxウィンドウを作成
+        const winbox = new WinBox({
+            title: pageTitle,
+            width: 800,
+            height: 600,
+            x: 100,
+            y: 100
+        });
+        
+        // ウィンドウ内にiframeを作成
+        const iframe = document.createElement('iframe');
+        iframe.style.width = '100%';
+        iframe.style.height = '100%';
+        iframe.style.border = 'none';
+        iframe.sandbox = 'allow-same-origin allow-scripts allow-forms allow-popups allow-top-navigation-by-user-activation';
+        
+        // プロキシURLを構築
+        let proxyUrl;
+        if (typeof proxyInstance !== 'undefined' && proxyInstance.buildProxyUrl) {
+            proxyUrl = proxyInstance.buildProxyUrl(currentUrl);
+        } else {
+            // フォールバック: シンプルエンコーディング
+            const encodedUrl = encodeURIComponent(currentUrl);
+            proxyUrl = `/a/${encodedUrl}`;
+        }
+        
+        iframe.src = proxyUrl;
+        
+        // デフォルトでLoiLo通信をブロック
+        iframe.addEventListener('load', () => {
+            try {
+                const iframeWindow = iframe.contentWindow;
+                const iframeDocument = iframe.contentDocument;
+                
+                if (iframeWindow && iframeDocument) {
+                    // WebSocketのブロック
+                    const originalWebSocket = iframeWindow.WebSocket;
+                    iframeWindow.WebSocket = function(url, protocols) {
+                        console.log('WebSocket接続をブロックしました:', url);
+                        throw new Error('WebSocket connections are blocked in this window');
+                    };
+                    
+                    // fetchのインターセプト
+                    const originalFetch = iframeWindow.fetch;
+                    iframeWindow.fetch = function(url, options) {
+                        if (typeof url === 'string' && url.includes('n.loilo.tv/api/notes/upload')) {
+                            console.log('LoiLo upload APIへのリクエストをブロックしました:', url);
+                            return Promise.reject(new Error('Request to LoiLo upload API is blocked'));
+                        }
+                        return originalFetch.call(this, url, options);
+                    };
+                    
+                    // XMLHttpRequestのインターセプト
+                    const originalXHR = iframeWindow.XMLHttpRequest;
+                    iframeWindow.XMLHttpRequest = function() {
+                        const xhr = new originalXHR();
+                        const originalOpen = xhr.open;
+                        xhr.open = function(method, url, ...args) {
+                            if (typeof url === 'string' && url.includes('n.loilo.tv/api/notes/upload')) {
+                                console.log('LoiLo upload APIへのXHRリクエストをブロックしました:', url);
+                                throw new Error('XMLHttpRequest to LoiLo upload API is blocked');
+                            }
+                            return originalOpen.call(this, method, url, ...args);
+                        };
+                        return xhr;
+                    };
+                    
+                    console.log('LoiLo通信ブロック機能を適用しました');
+                }
+            } catch (error) {
+                console.warn('通信ブロック機能の適用に失敗:', error);
+            }
+        });
+        
+        // WinBoxにiframeを追加
+        winbox.body.appendChild(iframe);
+        
+        console.log('ページ分割モードでURLを開きました:', currentUrl, '（LoiLo通信ブロック有効）');
+        
+        // フィードバックメッセージを表示
+        showPageSplitFeedback('ページを新しいウィンドウで開きました（LoiLo通信ブロック）', true);
+    }
+    
+    // ページ分割のフィードバックを表示する関数
+    function showPageSplitFeedback(message, isSuccess) {
+        const feedback = document.createElement('div');
+        feedback.style.cssText = `
+            position: fixed;
+            top: 20px;
+            left: 20px;
+            background: ${isSuccess ? '#dcfce7' : '#fef2f2'};
+            color: ${isSuccess ? '#166534' : '#dc2626'};
+            padding: 12px 16px;
+            border-radius: 8px;
+            font-size: 14px;
+            font-weight: 500;
+            z-index: 10002;
+            border: 1px solid ${isSuccess ? '#bbf7d0' : '#fecaca'};
+            box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+            max-width: 300px;
+            word-wrap: break-word;
+            transition: all 0.3s ease;
+        `;
+        
+        const icon = isSuccess ? '✓' : '✗';
+        feedback.innerHTML = `<strong>${icon}</strong> ${message}`;
+        
+        document.body.appendChild(feedback);
+        
+        // 3秒後に自動削除
+        setTimeout(() => {
+            if (feedback.parentNode) {
+                feedback.style.opacity = '0';
+                feedback.style.transform = 'translateX(-100%)';
+                setTimeout(() => {
+                    feedback.remove();
+                }, 300);
+            }
+        }, 3000);
+    }
+
     // 音声デモ機能 (統合/index.htmlから移植)
     function createVoiceDemo() {
         const winbox = new WinBox({
@@ -2971,17 +3142,28 @@
         // 設定値
         const SILENCE_THRESHOLD = 0.01;
         const SILENCE_DURATION = 1500;
+        const NOISE_GATE_THRESHOLD = 0.005; // ノイズゲート閾値
+        const ADAPTIVE_THRESHOLD_FACTOR = 2.5; // 適応的閾値の倍率
+        const SPECTRAL_CENTROID_MIN = 200; // 音声と判定する最小スペクトル重心(Hz)
+        const SPECTRAL_CENTROID_MAX = 3000; // 音声と判定する最大スペクトル重心(Hz)
 
         let websocket;
         let mediaRecorder;
         let localStream;
         let audioContext;
         let analyser;
+        let lowPassFilter; // ローパスフィルター
+        let noiseGate; // ノイズゲート
         let isRecording = false;
         let silenceTimer = null;
         let recordedChunks = [];
         let availableDevices = [];
         let currentAudioSource = null; // 現在再生中の音声ソースを追跡
+        let backgroundNoiseLevel = 0; // 背景ノイズレベル
+        let adaptiveThreshold = SILENCE_THRESHOLD; // 適応的閾値
+        let noiseCalibrationSamples = []; // ノイズキャリブレーション用サンプル
+        let isCalibrating = true; // キャリブレーション中かどうか
+        let calibrationStartTime = 0; // キャリブレーション開始時間
 
         // マイクデバイス一覧を取得
         async function refreshMicrophones() {
@@ -3120,8 +3302,32 @@
                 };
                 audioContext = new AudioContext();
                 analyser = audioContext.createAnalyser();
+                analyser.fftSize = 2048; // より高精度な周波数解析のため
+                analyser.smoothingTimeConstant = 0.8; // スムージング
+
+                // ローパスフィルターを作成（高周波ノイズ除去）
+                lowPassFilter = audioContext.createBiquadFilter();
+                lowPassFilter.type = 'lowpass';
+                lowPassFilter.frequency.setValueAtTime(3000, audioContext.currentTime); // 3kHz以上をカット
+                lowPassFilter.Q.setValueAtTime(1, audioContext.currentTime);
+
+                // ノイズゲートの代わりにコンプレッサーを使用
+                noiseGate = audioContext.createDynamicsCompressor();
+                noiseGate.threshold.setValueAtTime(-24, audioContext.currentTime);
+                noiseGate.knee.setValueAtTime(30, audioContext.currentTime);
+                noiseGate.ratio.setValueAtTime(12, audioContext.currentTime);
+                noiseGate.attack.setValueAtTime(0.003, audioContext.currentTime);
+                noiseGate.release.setValueAtTime(0.25, audioContext.currentTime);
+
                 const microphone = audioContext.createMediaStreamSource(localStream);
-                microphone.connect(analyser);
+                
+                // 音声処理チェーンを構築
+                microphone.connect(lowPassFilter);
+                lowPassFilter.connect(noiseGate);
+                noiseGate.connect(analyser);
+                
+                // ノイズキャリブレーション開始
+                startNoiseCalibration();
                 detectVoice();
             } catch (err) {
                 console.error('マイクへのアクセスに失敗しました:', err);
@@ -3144,10 +3350,60 @@
                 localStream.getTracks().forEach(track => track.stop());
                 localStream = null;
             }
+            
+            // オーディオフィルターのクリーンアップ
+            if (lowPassFilter) {
+                lowPassFilter.disconnect();
+                lowPassFilter = null;
+            }
+            if (noiseGate) {
+                noiseGate.disconnect();
+                noiseGate = null;
+            }
+            
             if (audioContext && audioContext.state !== 'closed') audioContext.close();
             if (mediaRecorder && mediaRecorder.state === 'recording') mediaRecorder.stop();
+            
+            // 状態変数のリセット
             isRecording = false;
+            isCalibrating = false;
+            backgroundNoiseLevel = 0;
+            adaptiveThreshold = SILENCE_THRESHOLD;
+            noiseCalibrationSamples = [];
+            
             clearTimeout(silenceTimer);
+        }
+
+        // ノイズキャリブレーション開始
+        function startNoiseCalibration() {
+            isCalibrating = true;
+            calibrationStartTime = Date.now();
+            noiseCalibrationSamples = [];
+            statusDiv.textContent = "環境ノイズを測定中... 静かにしてください（3秒）";
+            
+            setTimeout(() => {
+                finishNoiseCalibration();
+            }, 3000);
+        }
+
+        // ノイズキャリブレーション完了
+        function finishNoiseCalibration() {
+            isCalibrating = false;
+            if (noiseCalibrationSamples.length > 0) {
+                // 背景ノイズレベルを計算（平均値 + 標準偏差）
+                const avg = noiseCalibrationSamples.reduce((a, b) => a + b, 0) / noiseCalibrationSamples.length;
+                const variance = noiseCalibrationSamples.reduce((a, b) => a + Math.pow(b - avg, 2), 0) / noiseCalibrationSamples.length;
+                const stdDev = Math.sqrt(variance);
+                
+                backgroundNoiseLevel = avg + stdDev;
+                adaptiveThreshold = Math.max(backgroundNoiseLevel * ADAPTIVE_THRESHOLD_FACTOR, SILENCE_THRESHOLD);
+                
+                console.log(`ノイズキャリブレーション完了: 背景ノイズ=${backgroundNoiseLevel.toFixed(4)}, 適応閾値=${adaptiveThreshold.toFixed(4)}`);
+                statusDiv.textContent = `キャリブレーション完了。話しかけてください（閾値: ${adaptiveThreshold.toFixed(4)}）`;
+            } else {
+                adaptiveThreshold = SILENCE_THRESHOLD;
+                statusDiv.textContent = "キャリブレーション失敗。デフォルト設定で開始します。";
+            }
         }
 
         function getVolume() {
@@ -3158,29 +3414,133 @@
             return Math.sqrt(sumSquares / dataArray.length);
         }
 
+        // スペクトラム解析による改良された音声検出
+        function getSpectralCentroid() {
+            const bufferLength = analyser.frequencyBinCount;
+            const dataArray = new Uint8Array(bufferLength);
+            analyser.getByteFrequencyData(dataArray);
+            
+            let numerator = 0;
+            let denominator = 0;
+            
+            for (let i = 0; i < bufferLength; i++) {
+                const frequency = i * (audioContext.sampleRate / 2) / bufferLength;
+                const magnitude = dataArray[i];
+                numerator += frequency * magnitude;
+                denominator += magnitude;
+            }
+            
+            return denominator > 0 ? numerator / denominator : 0;
+        }
+
+        // 高周波数帯域のエネルギー比率を計算
+        function getHighFrequencyRatio() {
+            const bufferLength = analyser.frequencyBinCount;
+            const dataArray = new Uint8Array(bufferLength);
+            analyser.getByteFrequencyData(dataArray);
+            
+            let totalEnergy = 0;
+            let highFreqEnergy = 0;
+            
+            for (let i = 0; i < bufferLength; i++) {
+                const frequency = i * (audioContext.sampleRate / 2) / bufferLength;
+                const magnitude = dataArray[i];
+                totalEnergy += magnitude;
+                
+                if (frequency > 1000) { // 1kHz以上を高周波数とする
+                    highFreqEnergy += magnitude;
+                }
+            }
+            
+            return totalEnergy > 0 ? highFreqEnergy / totalEnergy : 0;
+        }
+
+        // ゼロ交差率を計算（音声の特徴検出）
+        function getZeroCrossingRate() {
+            const dataArray = new Float32Array(analyser.frequencyBinCount);
+            analyser.getFloatTimeDomainData(dataArray);
+            
+            let zeroCrossings = 0;
+            for (let i = 1; i < dataArray.length; i++) {
+                if ((dataArray[i - 1] >= 0) !== (dataArray[i] >= 0)) {
+                    zeroCrossings++;
+                }
+            }
+            
+            return zeroCrossings / dataArray.length;
+        }
+
         function detectVoice() {
             if (!localStream) return;
+            
             const volume = getVolume();
+            const spectralCentroid = getSpectralCentroid();
+            const highFreqRatio = getHighFrequencyRatio();
+            const zeroCrossingRate = getZeroCrossingRate();
+            
+            // ボリュームメーター更新
             volumeLevel.style.width = Math.min(volume * 500, 100) + '%';
-            if (volume > SILENCE_THRESHOLD) {
+            
+            // キャリブレーション中は背景ノイズを収集
+            if (isCalibrating) {
+                noiseCalibrationSamples.push(volume);
+                requestAnimationFrame(detectVoice);
+                return;
+            }
+            
+            // 複数の特徴量を組み合わせた音声検出
+            let isVoiceDetected = false;
+            
+            // 1. 基本的な音量チェック（適応的閾値使用）
+            const volumeCheck = volume > adaptiveThreshold;
+            
+            // 2. ノイズゲートチェック
+            const noiseGateCheck = volume > NOISE_GATE_THRESHOLD;
+            
+            // 3. スペクトラル重心チェック（人間の音声範囲）
+            const spectralCheck = spectralCentroid >= SPECTRAL_CENTROID_MIN && spectralCentroid <= SPECTRAL_CENTROID_MAX;
+            
+            // 4. 高周波数比率チェック（ノイズは高周波数成分が多い）
+            const highFreqCheck = highFreqRatio < 0.7; // 高周波数成分が70%未満
+            
+            // 5. ゼロ交差率チェック（音声は適度なゼロ交差率）
+            const zcrCheck = zeroCrossingRate > 0.02 && zeroCrossingRate < 0.3;
+            
+            // 統合判定：複数の条件を満たす場合のみ音声と判定
+            if (volumeCheck && noiseGateCheck) {
+                if (spectralCheck && highFreqCheck && zcrCheck) {
+                    isVoiceDetected = true;
+                } else if (volume > adaptiveThreshold * 2) {
+                    // 音量が非常に大きい場合は他の条件が満たされなくても音声と判定
+                    isVoiceDetected = true;
+                }
+            }
+            
+            // デバッグ情報をコンソールに出力（開発用）
+            if (volume > adaptiveThreshold * 0.8) { // 閾値の80%以上の場合のみログ出力
+                console.log(`音声検出: vol=${volume.toFixed(4)}, sc=${spectralCentroid.toFixed(0)}Hz, hfr=${highFreqRatio.toFixed(2)}, zcr=${zeroCrossingRate.toFixed(3)}, detected=${isVoiceDetected}`);
+            }
+            
+            if (isVoiceDetected) {
                 clearTimeout(silenceTimer);
                 silenceTimer = null;
                 if (!isRecording) {
                     isRecording = true;
                     recordedChunks = [];
                     mediaRecorder.start();
-                    statusDiv.textContent = "話していますね... 録音中";
-                    console.log("Recording started...");
+                    statusDiv.textContent = "音声検出 - 録音中...";
+                    console.log("高品質音声検出により録音開始");
                 }
             } else if (isRecording && !silenceTimer) {
-                statusDiv.textContent = "静かになりました... 発話終了を待っています";
+                statusDiv.textContent = "静寂検出 - 発話終了を待っています...";
                 silenceTimer = setTimeout(() => {
                     mediaRecorder.stop();
                     isRecording = false;
                     silenceTimer = null;
-                    console.log("Recording stopped due to silence.");
+                    console.log("静寂検出により録音停止");
                 }, SILENCE_DURATION);
             }
+            
             requestAnimationFrame(detectVoice);
         }
 

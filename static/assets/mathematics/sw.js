@@ -27,7 +27,7 @@ class UVServiceWorker extends EventEmitter {
           "x-powered-by",
           "x-xss-protection",
         ],
-        forward: ["accept-encoding", "connection", "content-length"],
+        forward: ["accept-encoding", "connection", "content-length", "accept-language"],
       }),
       (this.method = { empty: ["GET", "HEAD"] }),
       (this.statusCode = { empty: [204, 304] }),
@@ -108,6 +108,11 @@ class UVServiceWorker extends EventEmitter {
         n.forward.shift(),
         i && (n.headers.cookie = i),
         (n.headers.Host = n.url.host);
+      
+      // Accept-Languageヘッダーが空の場合はデフォルト値を設定
+      if (!n.headers["accept-language"] || n.headers["accept-language"].trim() === "") {
+        n.headers["accept-language"] = "ja,en-US;q=0.9,en;q=0.8";
+      }
       const o = new HookEvent(n, null, null);
       if ((this.emit("request", o), o.intercepted)) return o.returnValue;
       const a = await fetch(n.send);
