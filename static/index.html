@@ -73,30 +73,38 @@
       }
     };
 
-    // Service Workerをiframeプロキシ用に登録
-    if ('serviceWorker' in navigator) {
-      window.addEventListener('load', () => {
-        navigator.serviceWorker.register('./sw.js?v=2025-06-01', {
-          scope: '/'
-        }).then((registration) => {
-          console.log('Service Worker registered for iframe proxy:', registration);
-        }).catch((error) => {
-          console.error('Service Worker registration failed:', error);
-          
-          // Safariで Service Worker 登録が失敗した場合の警告
-          if (isSafari()) {
-            console.warn('Safari: Service Worker の登録に失敗しました。一部機能が制限される可能性があります。');
-          }
-        });
-      });
+    // 初回アクセス時にリロード処理を追加
+    if (localStorage.getItem('firstLoadDone') === null) {
+      localStorage.setItem('firstLoadDone', 'true');
+      console.log('First load detected, reloading page for Service Worker activation.');
+      window.location.reload();
     } else {
-      // Service Worker が対応していない場合の警告
-      console.warn('このブラウザはService Workerに対応していません。一部機能が制限されます。');
-      
-      if (isSafari()) {
-        console.warn('Safari: Service Worker機能が利用できません。');
+      // Service Workerをiframeプロキシ用に登録
+      if ('serviceWorker' in navigator) {
+        window.addEventListener('load', () => {
+          navigator.serviceWorker.register('./sw.js?v=2025-06-01', {
+            scope: '/'
+          }).then((registration) => {
+            console.log('Service Worker registered for iframe proxy:', registration);
+          }).catch((error) => {
+            console.error('Service Worker registration failed:', error);
+            
+            // Safariで Service Worker 登録が失敗した場合の警告
+            if (isSafari()) {
+              console.warn('Safari: Service Worker の登録に失敗しました。一部機能が制限される可能性があります。');
+            }
+          });
+        });
+      } else {
+        // Service Worker が対応していない場合の警告
+        console.warn('このブラウザはService Workerに対応していません。一部機能が制限されます。');
+        
+        if (isSafari()) {
+          console.warn('Safari: Service Worker機能が利用できません。');
+        }
       }
-    }    // モバイル端末検出関数
+    }
+    // モバイル端末検出関数
     function isMobileDevice() {
         return /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent) ||
                (navigator.maxTouchPoints && navigator.maxTouchPoints > 2) ||
@@ -701,19 +709,21 @@
     // ページ読み込み時にSafari互換性をチェック
     window.addEventListener('load', () => {
         // Chrome推奨ダイアログを最初に表示（MacOS + Safari の場合）
+        /*
         if (isMacOSSafari() && !localStorage.getItem('chromeRecommendationShown')) {
             setTimeout(() => {
                 showChromeRecommendationDialog();
             }, 800);
         }
+        */
         // 既存のSafari互換性チェック（Chrome推奨の後に表示）
-        else if (isSafari() && !localStorage.getItem('safariWarningShown')) {
+        if (isSafari() && !localStorage.getItem('safariWarningShown')) { // `else if` から `if` に変更
             const compatibilityResult = checkSafariCompatibility();
             if (!compatibilityResult.compatible || compatibilityResult.warnings.length > 0) {
                 // Chrome推奨ダイアログの後に表示
                 setTimeout(() => {
                     showSafariCompatibilityAlert(compatibilityResult);
-                }, 1500);
+                }, 1500); // 必要であれば遅延時間を調整
             }
         }
     });

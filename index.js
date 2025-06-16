@@ -99,34 +99,39 @@ function addToConversationHistory(sessionId, role, content, imageData = null) {
 
 // 最適化：オブジェクト作成を減らし、配列操作を高速化
 function buildConversationContext(sessionId, currentMessage, imageData = null) {
-  const history = getConversationHistory(sessionId);
-  const contextLength = history.length + 1;
-  const context = new Array(contextLength);
-  let index = 0;
-  
-  // 過去の会話履歴を追加（最適化：forEach避けてfor文使用）
+  const history = getConversationHistory(sessionId); // history は {role, content, imageData?, timestamp} の配列
+  const contextForApi = [];
+
+  // 過去の会話履歴を追加
   for (let i = 0; i < history.length; i++) {
     const msg = history[i];
     if (msg.role === 'user') {
-      context[index++] = {
+      // ユーザーの指示通り、過去の履歴の画像は送信しない
+      contextForApi.push({
         role: 'user',
-        parts: msg.imageData ? [msg.content, msg.imageData] : [msg.content]
-      };
+        parts: [{ text: msg.content }] // msg.content は文字列
+      });
     } else if (msg.role === 'model') {
-      context[index++] = {
+      contextForApi.push({
         role: 'model',
-        parts: [msg.content]
-      };
+        parts: [{ text: msg.content }] // msg.content は文字列
+      });
     }
   }
+
+  // 現在のメッセージを parts 形式で準備
+  const currentMessageParts = [{ text: currentMessage }]; // currentMessage は文字列
+  if (imageData) { // imageData は {inlineData: {...}} の形式、または null
+    currentMessageParts.push(imageData);
+  }
   
-  // 現在のメッセージを追加
-  context[index] = {
+  // APIに渡す形式の配列の最後に、現在のユーザーメッセージを追加
+  contextForApi.push({
     role: 'user',
-    parts: imageData ? [currentMessage, imageData] : [currentMessage]
-  };
-  
-  return context.slice(0, index + 1);
+    parts: currentMessageParts
+  });
+
+  return contextForApi;
 }
 
 // 古い会話セッションを定期的に削除（最適化：バッチ処理）

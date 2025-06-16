@@ -44,19 +44,24 @@ class UVServiceWorker extends EventEmitter {
     const defaultUserAgent = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/137.0.0.0 Safari/537.36";
     
     try {
+      // self.navigator 及び self.navigator.userAgent の存在を確認
+      if (typeof self === 'undefined' || !self.navigator || typeof self.navigator.userAgent === 'undefined') {
+        return defaultUserAgent;
+      }
+
       const currentUserAgent = self.navigator.userAgent;
       
       // ユーザーエージェントが存在しない、空、または無効な形式の場合
       if (!currentUserAgent ||
           currentUserAgent.trim() === "" ||
-          currentUserAgent.length < 10 ||
+          currentUserAgent.length < 10 || // 極端に短いUAも無効とみなす
           !this.isValidUserAgent(currentUserAgent)) {
         return defaultUserAgent;
       }
       
       return currentUserAgent;
     } catch (error) {
-      // ユーザーエージェントの取得に失敗した場合
+      // 念のためエラーハンドリング
       return defaultUserAgent;
     }
   }
@@ -109,6 +114,9 @@ class UVServiceWorker extends EventEmitter {
         i && (n.headers.cookie = i),
         (n.headers.Host = n.url.host);
       
+      // User-Agentヘッダーを強制的に設定
+      n.headers["user-agent"] = this.userAgent;
+
       // Accept-Languageヘッダーが空の場合はデフォルト値を設定
       if (!n.headers["accept-language"] || n.headers["accept-language"].trim() === "") {
         n.headers["accept-language"] = "ja,en-US;q=0.9,en;q=0.8";
