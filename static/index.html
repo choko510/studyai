@@ -538,15 +538,162 @@
         }, 15000);
     }
 
+    // MacOS + Safari検出関数
+    function isMacOSSafari() {
+        const userAgent = navigator.userAgent.toLowerCase();
+        const isMac = userAgent.includes('macintosh') || userAgent.includes('mac os x');
+        const isSafari = userAgent.includes('safari') && !userAgent.includes('chrome') && !userAgent.includes('chromium');
+        return isMac && isSafari;
+    }
+
+    // Chrome推奨ダイアログを表示する関数
+    function showChromeRecommendationDialog() {
+        const alertDiv = document.createElement('div');
+        Object.assign(alertDiv.style, {
+            position: 'fixed',
+            top: '50%',
+            left: '50%',
+            transform: 'translate(-50%, -50%)',
+            background: 'white',
+            borderRadius: '16px',
+            padding: '32px',
+            boxShadow: '0 20px 60px rgba(0,0,0,0.3)',
+            zIndex: 10002,
+            fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
+            color: '#1a1a1a',
+            maxWidth: '450px',
+            textAlign: 'center',
+            border: '2px solid #3b82f6'
+        });
+
+        alertDiv.innerHTML = `
+            <div style="margin-bottom: 20px;">
+                <div style="font-size: 48px; margin-bottom: 16px;">🌐</div>
+                <h3 style="margin: 0 0 16px 0; font-size: 22px; color: #1e40af; font-weight: 600;">
+                    より良い体験のために
+                </h3>
+            </div>
+            
+            <div style="text-align: left; margin-bottom: 24px;">
+                <p style="margin: 0 0 16px 0; font-size: 16px; color: #374151; line-height: 1.6;">
+                    <strong>MacOSでSafariをご利用中ですね！</strong>
+                </p>
+                <p style="margin: 0 0 20px 0; font-size: 14px; color: #6b7280; line-height: 1.5;">
+                    StudyAIの全機能を最大限に活用するため、<strong style="color: #1e40af;">Google Chrome</strong>のご利用をお勧めします。
+                </p>
+                
+                <div style="background: #f0f9ff; padding: 16px; border-radius: 12px; margin: 16px 0; border-left: 4px solid #3b82f6;">
+                    <h4 style="margin: 0 0 8px 0; font-size: 14px; color: #1e40af; font-weight: 600;">
+                        <i class="fas fa-star"></i> Chromeで利用できる追加機能：
+                    </h4>
+                    <ul style="margin: 0; padding-left: 20px; font-size: 13px; color: #374151; line-height: 1.4;">
+                        <li>リアルタイム画面キャプチャ</li>
+                        <li>高度な音声録音機能</li>
+                        <li>Service Worker による高速化</li>
+                        <li>WebRTC完全対応</li>
+                    </ul>
+                </div>
+            </div>
+            
+            <div style="display: flex; gap: 12px; justify-content: center; margin-top: 24px;">
+                <a href="https://www.google.com/chrome/" target="_blank"
+                   style="
+                       background: linear-gradient(135deg, #3b82f6, #1e40af);
+                       color: white;
+                       text-decoration: none;
+                       padding: 12px 24px;
+                       border-radius: 10px;
+                       font-size: 14px;
+                       font-weight: 600;
+                       display: flex;
+                       align-items: center;
+                       gap: 8px;
+                       transition: all 0.2s ease;
+                       box-shadow: 0 4px 12px rgba(59, 130, 246, 0.3);
+                   "
+                   onmouseover="this.style.transform='translateY(-2px)'; this.style.boxShadow='0 6px 16px rgba(59, 130, 246, 0.4)'"
+                   onmouseout="this.style.transform='translateY(0)'; this.style.boxShadow='0 4px 12px rgba(59, 130, 246, 0.3)'">
+                    <i class="fab fa-chrome"></i>
+                    Chromeをダウンロード
+                </a>
+                <button id="chrome-alert-continue" style="
+                    background: #f3f4f6;
+                    color: #6b7280;
+                    border: 1px solid #d1d5db;
+                    padding: 12px 20px;
+                    border-radius: 10px;
+                    cursor: pointer;
+                    font-size: 14px;
+                    font-weight: 500;
+                    transition: all 0.2s ease;
+                ">Safariで続行</button>
+            </div>
+            
+            <div style="margin-top: 16px; text-align: center;">
+                <label style="display: flex; align-items: center; justify-content: center; gap: 8px; font-size: 12px; color: #9ca3af; cursor: pointer;">
+                    <input type="checkbox" id="dont-show-again" style="margin: 0;">
+                    今後このメッセージを表示しない
+                </label>
+            </div>
+        `;
+
+        document.body.appendChild(alertDiv);
+
+        // ボタンイベント
+        const continueBtn = alertDiv.querySelector('#chrome-alert-continue');
+        const dontShowCheckbox = alertDiv.querySelector('#dont-show-again');
+        
+        continueBtn.addEventListener('click', () => {
+            if (dontShowCheckbox.checked) {
+                localStorage.setItem('chromeRecommendationShown', 'true');
+            }
+            alertDiv.remove();
+        });
+
+        // ボタンホバー効果
+        continueBtn.addEventListener('mouseover', () => {
+            continueBtn.style.background = '#e5e7eb';
+            continueBtn.style.color = '#374151';
+        });
+        continueBtn.addEventListener('mouseout', () => {
+            continueBtn.style.background = '#f3f4f6';
+            continueBtn.style.color = '#6b7280';
+        });
+
+        // 背景クリックで閉じる
+        alertDiv.addEventListener('click', (e) => {
+            if (e.target === alertDiv) {
+                if (dontShowCheckbox.checked) {
+                    localStorage.setItem('chromeRecommendationShown', 'true');
+                }
+                alertDiv.remove();
+            }
+        });
+
+        // 15秒後に自動で閉じる
+        setTimeout(() => {
+            if (alertDiv.parentNode) {
+                alertDiv.remove();
+            }
+        }, 15000);
+    }
+
     // ページ読み込み時にSafari互換性をチェック
     window.addEventListener('load', () => {
-        if (isSafari() && !localStorage.getItem('safariWarningShown')) {
+        // Chrome推奨ダイアログを最初に表示（MacOS + Safari の場合）
+        if (isMacOSSafari() && !localStorage.getItem('chromeRecommendationShown')) {
+            setTimeout(() => {
+                showChromeRecommendationDialog();
+            }, 800);
+        }
+        // 既存のSafari互換性チェック（Chrome推奨の後に表示）
+        else if (isSafari() && !localStorage.getItem('safariWarningShown')) {
             const compatibilityResult = checkSafariCompatibility();
             if (!compatibilityResult.compatible || compatibilityResult.warnings.length > 0) {
-                // 少し遅らせて表示（他の初期化が完了してから）
+                // Chrome推奨ダイアログの後に表示
                 setTimeout(() => {
                     showSafariCompatibilityAlert(compatibilityResult);
-                }, 1000);
+                }, 1500);
             }
         }
     });
@@ -2915,7 +3062,7 @@
 
         // WebSocketのURLを動的に生成
         const proto = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-        const WEBSOCKET_URL = `${proto}//${window.location.host}/ws`;
+        const WEBSOCKET_URL = `${proto}//${window.location.host}/voice/ws`;
 
         // 設定値
         const SILENCE_THRESHOLD = 0.01;

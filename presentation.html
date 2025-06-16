@@ -1,0 +1,1429 @@
+<!DOCTYPE html>
+<html lang="ja">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AIBrowser - 次世代AIブラウザプレゼンテーション</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap"
+        rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+    <style>
+        :root {
+            --primary-color: #3b82f6;
+            --secondary-color: #10b981;
+            --accent-color: #f59e0b;
+            --text-dark: #111827;
+            --text-medium: #374151;
+            --text-light: #6b7280;
+            --bg-light: #f9fafb;
+            --bg-white: #ffffff;
+            --border-color: #e5e7eb;
+            --shadow-sm: 0 4px 6px -1px rgba(0, 0, 0, 0.05), 0 2px 4px -2px rgba(0, 0, 0, 0.05);
+            --shadow-md: 0 10px 15px -3px rgba(0, 0, 0, 0.07), 0 4px 6px -4px rgba(0, 0, 0, 0.07);
+            --shadow-lg: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 8px 10px -6px rgba(0, 0, 0, 0.1);
+            --border-radius: 24px;
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        html {
+            scroll-behavior: smooth;
+        }
+
+        body {
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+            background: linear-gradient(135deg, #fdfdff 0%, var(--bg-light) 50%, #f1f5f9 100%);
+            color: var(--text-dark);
+            overflow: hidden;
+            height: 100vh;
+            position: relative;
+        }
+
+        /* Background animations */
+        body::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background:
+                radial-gradient(circle at 15% 25%, rgba(59, 130, 246, 0.04) 0%, transparent 40%),
+                radial-gradient(circle at 85% 75%, rgba(16, 185, 129, 0.06) 0%, transparent 40%),
+                radial-gradient(circle at 50% 50%, rgba(245, 158, 11, 0.03) 0%, transparent 30%);
+            animation: backgroundShift 25s ease-in-out infinite;
+            z-index: -1;
+        }
+
+        @keyframes backgroundShift {
+
+            0%,
+            100% {
+                transform: translate(0, 0);
+            }
+
+            25% {
+                transform: translate(10px, -10px);
+            }
+
+            50% {
+                transform: translate(-10px, 10px);
+            }
+
+            75% {
+                transform: translate(5px, 5px);
+            }
+        }
+
+        .presentation-container {
+            position: relative;
+            width: 100%;
+            height: 100vh;
+            perspective: 2000px;
+            overflow: hidden;
+        }
+
+        .slide {
+            display: none;
+            width: 100%;
+            height: 100vh;
+            padding: 50px 60px;
+            opacity: 0;
+            position: absolute;
+            top: 0;
+            left: 0;
+            transition: all 1.2s cubic-bezier(0.25, 0.46, 0.45, 0.94);
+            overflow-y: auto;
+            transform-style: preserve-3d;
+            backface-visibility: hidden;
+        }
+
+        .slide.active {
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            opacity: 1;
+            transform: translateZ(0) translateX(0) rotateY(0) scale(1);
+            z-index: 10;
+        }
+
+        /* 3D Cube Transition Effects */
+        .slide.cube-left {
+            transform: translateX(-100%) rotateY(-90deg);
+            opacity: 0;
+        }
+
+        .slide.cube-right {
+            transform: translateX(100%) rotateY(90deg);
+            opacity: 0;
+        }
+
+        .slide.cube-up {
+            transform: translateY(-100%) rotateX(90deg);
+            opacity: 0;
+        }
+
+        .slide.cube-down {
+            transform: translateY(100%) rotateX(-90deg);
+            opacity: 0;
+        }
+
+        /* Zoom Effects */
+        .slide.zoom-in {
+            transform: scale(0.3) translateZ(-1000px);
+            opacity: 0;
+        }
+
+        .slide.zoom-out {
+            transform: scale(2) translateZ(1000px);
+            opacity: 0;
+        }
+
+        /* Flip Effects */
+        .slide.flip-horizontal {
+            transform: rotateY(180deg);
+            opacity: 0;
+        }
+
+        .slide.flip-vertical {
+            transform: rotateX(180deg);
+            opacity: 0;
+        }
+
+        /* Slide Effects */
+        .slide.slide-left {
+            transform: translateX(-100%);
+            opacity: 0;
+        }
+
+        .slide.slide-right {
+            transform: translateX(100%);
+            opacity: 0;
+        }
+
+        .slide.slide-up {
+            transform: translateY(-100%);
+            opacity: 0;
+        }
+
+        .slide.slide-down {
+            transform: translateY(100%);
+            opacity: 0;
+        }
+
+        /* Morphing Effects */
+        .slide.morph {
+            transform: scale(0) rotate(180deg);
+            opacity: 0;
+            border-radius: 50%;
+        }
+
+        /* Parallax Background */
+        .slide::before {
+            content: '';
+            position: absolute;
+            top: -50%;
+            left: -50%;
+            width: 200%;
+            height: 200%;
+            background:
+                radial-gradient(circle at 20% 20%, rgba(59, 130, 246, 0.1) 0%, transparent 50%),
+                radial-gradient(circle at 80% 80%, rgba(16, 185, 129, 0.1) 0%, transparent 50%),
+                radial-gradient(circle at 40% 60%, rgba(245, 158, 11, 0.1) 0%, transparent 50%);
+            opacity: 0;
+            transition: all 1.5s ease;
+            animation: parallaxFloat 20s infinite ease-in-out;
+            z-index: -1;
+        }
+
+        .slide.active::before {
+            opacity: 1;
+        }
+
+        @keyframes parallaxFloat {
+            0%, 100% { transform: translate(0, 0) rotate(0deg); }
+            25% { transform: translate(-20px, -20px) rotate(5deg); }
+            50% { transform: translate(20px, -10px) rotate(-3deg); }
+            75% { transform: translate(-10px, 20px) rotate(3deg); }
+        }
+
+        /* Particle System */
+        .particles {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none;
+            z-index: 1;
+        }
+
+        .particle {
+            position: absolute;
+            width: 4px;
+            height: 4px;
+            background: radial-gradient(circle, rgba(59, 130, 246, 0.8) 0%, transparent 70%);
+            border-radius: 50%;
+            animation: float 6s infinite ease-in-out;
+        }
+
+        @keyframes float {
+            0%, 100% {
+                transform: translateY(0) rotate(0deg);
+                opacity: 0;
+            }
+            10% { opacity: 1; }
+            90% { opacity: 1; }
+            50% { transform: translateY(-100vh) rotate(180deg); }
+        }
+
+        /* Liquid Morphing Background */
+        .liquid-bg {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: linear-gradient(45deg, #3b82f6, #10b981, #f59e0b);
+            opacity: 0;
+            transition: opacity 1s ease;
+            z-index: -2;
+            filter: blur(100px);
+            animation: liquidMorph 15s infinite ease-in-out;
+        }
+
+        @keyframes liquidMorph {
+            0%, 100% {
+                transform: scale(1) rotate(0deg);
+                border-radius: 0;
+            }
+            25% {
+                transform: scale(1.2) rotate(90deg);
+                border-radius: 50% 20% 50% 20%;
+            }
+            50% {
+                transform: scale(0.8) rotate(180deg);
+                border-radius: 20% 50% 20% 50%;
+            }
+            75% {
+                transform: scale(1.1) rotate(270deg);
+                border-radius: 50% 50% 20% 20%;
+            }
+        }
+
+        .slide.active .liquid-bg {
+            opacity: 0.03;
+        }
+
+
+        /* Navigation UI */
+        .nav-arrow {
+            position: fixed;
+            top: 50%;
+            transform: translateY(-50%);
+            width: 50px;
+            height: 50px;
+            background: rgba(255, 255, 255, 0.7);
+            backdrop-filter: blur(10px);
+            border: 1px solid var(--border-color);
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.5rem;
+            color: var(--text-medium);
+            cursor: pointer;
+            z-index: 100;
+            transition: all 0.3s ease;
+            box-shadow: var(--shadow-sm);
+        }
+
+        .nav-arrow:hover {
+            background: var(--bg-white);
+            transform: translateY(-50%) scale(1.1);
+            box-shadow: var(--shadow-md);
+            color: var(--primary-color);
+        }
+
+        .nav-arrow.left {
+            left: 30px;
+        }
+
+        .nav-arrow.right {
+            right: 30px;
+        }
+
+        .nav-arrow.hidden {
+            opacity: 0;
+            pointer-events: none;
+        }
+
+        .progress-bar {
+            position: fixed;
+            bottom: 0;
+            left: 0;
+            height: 6px;
+            background: var(--primary-color);
+            z-index: 100;
+            transition: width 0.4s ease;
+            border-top-right-radius: 3px;
+            border-bottom-right-radius: 3px;
+        }
+
+        /* Typography */
+        .slide h1 {
+            font-size: clamp(3.5rem, 8vw, 6.5rem);
+            font-weight: 900;
+            background: linear-gradient(135deg, var(--primary-color), #06b6d4, var(--secondary-color));
+            -webkit-background-clip: text;
+            background-clip: text;
+            -webkit-text-fill-color: transparent;
+            margin-bottom: 1.5rem;
+            text-align: center;
+            letter-spacing: -0.04em;
+            line-height: 1;
+        }
+
+        .slide h2 {
+            font-size: clamp(2.5rem, 5vw, 4rem);
+            font-weight: 800;
+            color: var(--text-dark);
+            margin-bottom: 3.5rem;
+            text-align: center;
+            letter-spacing: -0.02em;
+        }
+
+        .slide h3 {
+            font-size: clamp(1.8rem, 3vw, 2.5rem);
+            font-weight: 700;
+            color: var(--text-medium);
+            margin-bottom: 2rem;
+            text-align: center;
+        }
+
+        .slide p {
+            font-size: clamp(1.1rem, 2.5vw, 1.5rem);
+            line-height: 1.7;
+            color: var(--text-light);
+            margin-bottom: 2rem;
+            max-width: 900px;
+            text-align: center;
+        }
+
+        .subtitle {
+            font-size: clamp(1.3rem, 3vw, 2rem);
+            color: var(--text-light);
+            font-weight: 500;
+            margin-bottom: 3rem;
+            text-align: center;
+        }
+
+        /* Card and grid layouts */
+        .content-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+            gap: 2.5rem;
+            width: 100%;
+            max-width: 1400px;
+            margin: 2rem 0;
+        }
+
+        .feature-card {
+            background: rgba(255, 255, 255, 0.6);
+            backdrop-filter: blur(20px);
+            border: 1px solid var(--border-color);
+            padding: 2.5rem;
+            border-radius: var(--border-radius);
+            transition: all 0.4s cubic-bezier(0.23, 1, 0.32, 1);
+            position: relative;
+            overflow: hidden;
+            box-shadow: var(--shadow-sm);
+            text-align: center;
+        }
+
+        .feature-card:hover {
+            transform: translateY(-10px);
+            background: var(--bg-white);
+            border-color: rgba(59, 130, 246, 0.4);
+            box-shadow: var(--shadow-lg);
+        }
+
+        .feature-card::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            right: 0;
+            bottom: 0;
+            left: 0;
+            background: radial-gradient(circle at center, rgba(59, 130, 246, 0.15) 0%, transparent 70%);
+            opacity: 0;
+            transition: opacity 0.5s ease;
+        }
+
+        .feature-card:hover::before {
+            opacity: 1;
+        }
+
+        .feature-card i {
+            font-size: 3.5rem;
+            background: linear-gradient(135deg, var(--primary-color), var(--secondary-color));
+            -webkit-background-clip: text;
+            background-clip: text;
+            -webkit-text-fill-color: transparent;
+            margin-bottom: 1.5rem;
+            display: block;
+        }
+
+        .feature-card h4 {
+            font-size: 1.5rem;
+            font-weight: 700;
+            color: var(--text-dark);
+            margin-bottom: 1rem;
+        }
+
+        .feature-card p {
+            font-size: 1.05rem;
+            color: var(--text-light);
+            line-height: 1.6;
+            margin-bottom: 0;
+            text-align: center;
+        }
+
+        /* Enhanced button styles */
+        .cta-button {
+            background: linear-gradient(135deg, var(--primary-color), #1d4ed8);
+            color: white;
+            border: none;
+            padding: 1.2rem 3rem;
+            font-size: 1.2rem;
+            font-weight: 600;
+            border-radius: 16px;
+            cursor: pointer;
+            transition: all 0.3s cubic-bezier(0.23, 1, 0.32, 1);
+            margin: 1rem;
+            text-decoration: none;
+            display: inline-flex;
+            align-items: center;
+            gap: 0.8rem;
+            position: relative;
+            overflow: hidden;
+            box-shadow: var(--shadow-md);
+        }
+
+        .cta-button:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 18px 45px rgba(59, 130, 246, 0.35);
+        }
+
+        .cta-button i {
+            transition: transform 0.3s ease;
+        }
+
+        .cta-button:hover i {
+            transform: rotate(10deg) scale(1.1);
+        }
+
+        /* Problem/Solution lists */
+        .dual-list-container {
+            display: grid;
+            grid-template-columns: 1fr 50px 1fr;
+            align-items: center;
+            gap: 2rem;
+            width: 100%;
+            max-width: 1200px;
+        }
+
+        .styled-list {
+            text-align: left;
+            list-style: none;
+            padding: 2rem;
+            border-radius: var(--border-radius);
+            border: 1px solid var(--border-color);
+            background: rgba(255, 255, 255, 0.5);
+            backdrop-filter: blur(10px);
+        }
+
+        .styled-list h3 {
+            margin-bottom: 2rem;
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+            font-size: 1.8rem;
+        }
+
+        .styled-list li {
+            font-size: 1.15rem;
+            line-height: 1.6;
+            margin-bottom: 1.2rem;
+            display: flex;
+            align-items: flex-start;
+            gap: 1rem;
+        }
+
+        .styled-list li::before {
+            font-family: "Font Awesome 6 Free";
+            font-weight: 900;
+            font-size: 1.2rem;
+            margin-top: 4px;
+            flex-shrink: 0;
+        }
+
+        .problem-list h3 {
+            color: #ef4444;
+        }
+
+        .problem-list li {
+            color: #b91c1c;
+        }
+
+        .problem-list li::before {
+            content: "\f00d";
+            /* fa-times */
+            color: #ef4444;
+        }
+
+        .solution-list h3 {
+            color: var(--secondary-color);
+        }
+
+        .solution-list li {
+            color: #047857;
+        }
+
+        .solution-list li::before {
+            content: "\f00c";
+            /* fa-check */
+            color: var(--secondary-color);
+        }
+
+        .arrow-divider i {
+            font-size: 3rem;
+            color: var(--primary-color);
+            animation: pulseArrow 2s infinite ease-in-out;
+        }
+
+        @keyframes pulseArrow {
+
+            0%,
+            100% {
+                transform: scale(1);
+            }
+
+            50% {
+                transform: scale(1.2);
+            }
+        }
+
+        /* Animations */
+        [data-animation] {
+            opacity: 0;
+            transform: translateY(40px);
+            transition: opacity 0.8s ease, transform 0.8s ease;
+        }
+
+        .slide.active [data-animation] {
+            opacity: 1;
+            transform: translateY(0);
+        }
+
+        /* Mobile optimizations */
+        @media (max-width: 992px) {
+            .dual-list-container {
+                grid-template-columns: 1fr;
+                gap: 2.5rem;
+            }
+
+            .arrow-divider {
+                transform: rotate(90deg);
+            }
+        }
+
+        @media (max-width: 768px) {
+            .slide {
+                padding: 3rem 1.5rem;
+            }
+
+            .nav-arrow {
+                width: 40px;
+                height: 40px;
+                font-size: 1.2rem;
+            }
+
+            .nav-arrow.left {
+                left: 15px;
+            }
+
+            .nav-arrow.right {
+                right: 15px;
+            }
+        }
+
+        /* Specific Slide Styles */
+        #slide5 .browser-mockup {
+            background: #ffffff;
+            border-radius: 20px;
+            padding: 1.5rem;
+            margin: 2rem 0;
+            border: 1px solid var(--border-color);
+            max-width: 1000px;
+            width: 100%;
+            box-shadow: var(--shadow-lg);
+        }
+
+        #slide5 .browser-header {
+            background: #f3f4f6;
+            height: 40px;
+            border-radius: 12px 12px 0 0;
+            display: flex;
+            align-items: center;
+            padding: 0 1rem;
+            gap: 0.5rem;
+            border-bottom: 1px solid #d1d5db;
+        }
+
+        #slide5 .browser-dots {
+            display: flex;
+            gap: 8px;
+        }
+
+        #slide5 .dot {
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+        }
+
+        #slide5 .dot.red {
+            background: #ef4444;
+        }
+
+        #slide5 .dot.yellow {
+            background: #f59e0b;
+        }
+
+        #slide5 .dot.green {
+            background: #10b981;
+        }
+
+        #slide7 .microphone-animation {
+            position: relative;
+            width: 150px;
+            height: 150px;
+            margin: 3rem auto;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        #slide7 .microphone-animation i {
+            font-size: 6rem;
+            color: var(--primary-color);
+            z-index: 2;
+        }
+
+        #slide7 .wave {
+            position: absolute;
+            width: 100%;
+            height: 100%;
+            border: 3px solid var(--primary-color);
+            border-radius: 50%;
+            animation: soundWave 2.5s infinite ease-out;
+            opacity: 0;
+        }
+
+        #slide7 .wave:nth-child(2) {
+            animation-delay: 0.8s;
+        }
+
+        #slide7 .wave:nth-child(3) {
+            animation-delay: 1.6s;
+        }
+
+        @keyframes soundWave {
+            0% {
+                transform: scale(0.5);
+                opacity: 1;
+            }
+
+            100% {
+                transform: scale(2.5);
+                opacity: 0;
+            }
+        }
+
+        /* Cinematic Zoom Effect */
+        .cinematic-zoom {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: radial-gradient(circle, transparent 30%, rgba(0,0,0,0.8) 100%);
+            opacity: 0;
+            transition: opacity 0.5s ease;
+            pointer-events: none;
+            z-index: 5;
+        }
+
+        .cinematic-zoom.active {
+            opacity: 1;
+        }
+
+        /* Audio Visualizer Effect */
+        .visualizer {
+            position: absolute;
+            bottom: 0;
+            left: 0;
+            width: 100%;
+            height: 100px;
+            display: flex;
+            align-items: flex-end;
+            justify-content: center;
+            gap: 3px;
+            opacity: 0;
+            transition: opacity 0.5s ease;
+            z-index: 2;
+        }
+
+        .visualizer.active {
+            opacity: 0.6;
+        }
+
+        .visualizer-bar {
+            width: 4px;
+            background: linear-gradient(to top, var(--primary-color), var(--secondary-color));
+            border-radius: 2px 2px 0 0;
+            animation: visualize 0.5s infinite ease-in-out alternate;
+        }
+
+        @keyframes visualize {
+            from { height: 10px; }
+            to { height: var(--bar-height, 50px); }
+        }
+
+        /* Holographic Effect */
+        .holographic {
+            position: relative;
+            overflow: hidden;
+        }
+
+        .holographic::after {
+            content: '';
+            position: absolute;
+            top: -50%;
+            left: -50%;
+            width: 200%;
+            height: 200%;
+            background: linear-gradient(
+                45deg,
+                transparent 30%,
+                rgba(255, 255, 255, 0.2) 50%,
+                transparent 70%
+            );
+            animation: holographicSweep 3s infinite ease-in-out;
+            pointer-events: none;
+        }
+
+        @keyframes holographicSweep {
+            0% { transform: translateX(-100%) translateY(-100%) rotate(45deg); }
+            100% { transform: translateX(100%) translateY(100%) rotate(45deg); }
+        }
+
+        /* Matrix Rain Effect */
+        .matrix-rain {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            overflow: hidden;
+            pointer-events: none;
+            z-index: 1;
+        }
+
+        .matrix-char {
+            position: absolute;
+            color: var(--primary-color);
+            font-family: 'Courier New', monospace;
+            font-weight: bold;
+            opacity: 0.7;
+            animation: matrixDrop 4s linear infinite;
+        }
+
+        @keyframes matrixDrop {
+            0% {
+                transform: translateY(-100vh);
+                opacity: 0;
+            }
+            10% {
+                opacity: 0.7;
+            }
+            90% {
+                opacity: 0.7;
+            }
+            100% {
+                transform: translateY(100vh);
+                opacity: 0;
+            }
+        }
+
+        /* Glitch Effect */
+        .glitch {
+            position: relative;
+        }
+
+        .glitch::before,
+        .glitch::after {
+            content: attr(data-text);
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+        }
+
+        .glitch::before {
+            animation: glitch1 0.5s infinite;
+            color: #ff0000;
+            z-index: -1;
+        }
+
+        .glitch::after {
+            animation: glitch2 0.5s infinite;
+            color: #00ff00;
+            z-index: -2;
+        }
+
+        @keyframes glitch1 {
+            0%, 100% { transform: translate(0); }
+            20% { transform: translate(-2px, 2px); }
+            40% { transform: translate(-2px, -2px); }
+            60% { transform: translate(2px, 2px); }
+            80% { transform: translate(2px, -2px); }
+        }
+
+        @keyframes glitch2 {
+            0%, 100% { transform: translate(0); }
+            20% { transform: translate(2px, -2px); }
+            40% { transform: translate(2px, 2px); }
+            60% { transform: translate(-2px, -2px); }
+            80% { transform: translate(-2px, 2px); }
+        }
+
+        /* Neon Glow Effect */
+        .neon-glow {
+            text-shadow:
+                0 0 5px currentColor,
+                0 0 10px currentColor,
+                0 0 15px currentColor,
+                0 0 20px var(--primary-color),
+                0 0 35px var(--primary-color),
+                0 0 40px var(--primary-color);
+            animation: neonFlicker 2s infinite alternate;
+        }
+
+        @keyframes neonFlicker {
+            0%, 18%, 22%, 25%, 53%, 57%, 100% {
+                text-shadow:
+                    0 0 5px currentColor,
+                    0 0 10px currentColor,
+                    0 0 15px currentColor,
+                    0 0 20px var(--primary-color),
+                    0 0 35px var(--primary-color),
+                    0 0 40px var(--primary-color);
+            }
+            20%, 24%, 55% {
+                text-shadow: none;
+            }
+        }
+
+        /* Transition Overlay */
+        .transition-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: radial-gradient(circle, var(--primary-color) 0%, var(--secondary-color) 100%);
+            opacity: 0;
+            transform: scale(0);
+            transition: all 0.8s cubic-bezier(0.25, 0.46, 0.45, 0.94);
+            z-index: 100;
+            pointer-events: none;
+        }
+
+        .transition-overlay.active {
+            opacity: 1;
+            transform: scale(2);
+        }
+
+        /* Geometric Shapes Animation */
+        .geometric-shapes {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none;
+        }
+
+        .shape {
+            position: absolute;
+            opacity: 0.1;
+            animation: geometricFloat 8s infinite ease-in-out;
+        }
+
+        .shape.triangle {
+            width: 0;
+            height: 0;
+            border-left: 25px solid transparent;
+            border-right: 25px solid transparent;
+            border-bottom: 43px solid var(--primary-color);
+        }
+
+        .shape.circle {
+            width: 50px;
+            height: 50px;
+            border-radius: 50%;
+            background: var(--secondary-color);
+        }
+
+        .shape.square {
+            width: 40px;
+            height: 40px;
+            background: var(--accent-color);
+            transform: rotate(45deg);
+        }
+
+        @keyframes geometricFloat {
+            0%, 100% {
+                transform: translateY(0) rotate(0deg);
+            }
+            50% {
+                transform: translateY(-50px) rotate(180deg);
+            }
+        }
+    </style>
+</head>
+
+<body>
+    <div class="presentation-container">
+        <!-- Transition Overlay -->
+        <div class="transition-overlay" id="transition-overlay"></div>
+        
+        <!-- Cinematic Zoom -->
+        <div class="cinematic-zoom" id="cinematic-zoom"></div>
+        
+        <!-- Liquid Background -->
+        <div class="liquid-bg"></div>
+        
+        <!-- Particles Container -->
+        <div class="particles" id="particles"></div>
+        
+        <!-- Audio Visualizer -->
+        <div class="visualizer" id="visualizer"></div>
+        
+        <!-- Matrix Rain -->
+        <div class="matrix-rain" id="matrix-rain"></div>
+        
+        <!-- Geometric Shapes -->
+        <div class="geometric-shapes" id="geometric-shapes"></div>
+
+        <!-- スライド 1: タイトル -->
+        <div class="slide active" id="slide1" data-slide="1">
+            <h1 data-animation>AIBrowser</h1>
+            <p class="subtitle" data-animation style="transition-delay: 0.1s;">AIと一緒に、もっと賢くウェブを使おう</p>
+            <p data-animation style="transition-delay: 0.2s;">画面を囲むだけで、何でも教えてくれる次世代ブラウザ</p>
+            <div style="margin-top: 4rem; display: flex; justify-content: center; align-items: center; gap: 3rem;"
+                data-animation style="transition-delay: 0.3s;">
+                <i class="fas fa-robot" style="font-size: 5rem; color: var(--primary-color);"></i>
+                <i class="fas fa-plus" style="font-size: 2rem; color: #94a3b8;"></i>
+                <i class="fas fa-globe" style="font-size: 5rem; color: var(--secondary-color);"></i>
+            </div>
+        </div>
+
+        <!-- スライド 2: 従来の問題点 (改良版) -->
+        <div class="slide" id="slide2" data-slide="2">
+            <h2 data-animation>なぜ、"調べる"はこんなに大変なのか？</h2>
+            <p data-animation style="transition-delay: 0.1s; margin-bottom: 3rem;">情報爆発の時代、ウェブ検索には多くの壁が存在します。</p>
+            <div class="styled-list problem-list" data-animation style="transition-delay: 0.2s;">
+                <h3><i class="fas fa-exclamation-circle"></i>従来のブラウザの限界</h3>
+                <ul>
+                    <li><strong>情報過多の海:</strong> 検索結果は多いが、本当に知りたい情報を見つけるのは一苦労。</li>
+                    <li><strong>タブ地獄:</strong> 複数のサイトを見比べ、情報をつなぎ合わせるのに何十ものタブを開いてしまう。</li>
+                    <li><strong>専門用語の壁:</strong> 難しい言葉が出るたびに検索を中断し、別のタブで調べ直す必要がある。</li>
+                    <li><strong>コンテキストの喪失:</strong> ページを離れると元の文脈を忘れ、思考が途切れてしまう。</li>
+                </ul>
+            </div>
+        </div>
+
+        <!-- スライド 3: AIBrowserの解決策 (改良版) -->
+        <div class="slide" id="slide3" data-slide="3">
+            <h2 data-animation>AIBrowserが "調べる" を再定義する</h2>
+            <p data-animation style="transition-delay: 0.1s; margin-bottom: 3rem;">私たちは、ウェブ体験を根本から変革します。</p>
+            <div class="dual-list-container" data-animation style="transition-delay: 0.2s;">
+                <div class="styled-list problem-list">
+                    <h3><i class="fas fa-thumbs-down"></i>Before</h3>
+                    <ul>
+                        <li>情報過多で混乱</li>
+                        <li>タブ地獄で非効率</li>
+                        <li>専門用語で中断</li>
+                        <li>文脈を失い思考停止</li>
+                    </ul>
+                </div>
+                <div class="arrow-divider">
+                    <i class="fas fa-long-arrow-alt-right"></i>
+                </div>
+                <div class="styled-list solution-list">
+                    <h3><i class="fas fa-thumbs-up"></i>After with AIBrowser</h3>
+                    <ul>
+                        <li>囲むだけでAIが要約</li>
+                        <li>1つの画面で対話・完結</li>
+                        <li>その場で平易に解説</li>
+                        <li>思考を止めずに理解</li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+
+        <!-- スライド 4: 主な機能概要 -->
+        <div class="slide" id="slide4" data-slide="4">
+            <h2 data-animation>革新的な4つのコア機能</h2>
+            <div class="content-grid">
+                <div class="feature-card" data-animation style="transition-delay: 0.1s;">
+                    <i class="fas fa-mouse-pointer"></i>
+                    <h4>画面マーキング</h4>
+                    <p>右クリックで範囲を囲むだけ。AIが即座に内容を解析・説明します。</p>
+                </div>
+                <div class="feature-card" data-animation style="transition-delay: 0.2s;">
+                    <i class="fas fa-comments"></i>
+                    <h4>リアルタイムAIチャット</h4>
+                    <p>24時間いつでも質問可能。画像アップロードにも対応しています。</p>
+                </div>
+                <div class="feature-card" data-animation style="transition-delay: 0.3s;">
+                    <i class="fas fa-microphone-lines"></i>
+                    <h4>音声対話</h4>
+                    <p>話すだけで質問。自然な会話でAIとやり取りできます。</p>
+                </div>
+                <div class="feature-card" data-animation style="transition-delay: 0.4s;">
+                    <i class="fas fa-calculator"></i>
+                    <h4>数学問題解答</h4>
+                    <p>複雑な数学問題も、ステップバイステップで分かりやすく解説します。</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- スライド 5: 画面マーキング機能デモ -->
+        <div class="slide" id="slide5" data-slide="5">
+            <h2 data-animation>コア機能: 画面マーキング</h2>
+            <div class="browser-mockup" data-animation style="transition-delay: 0.1s;">
+                <div class="browser-header">
+                    <div class="browser-dots">
+                        <div class="dot red"></div>
+                        <div class="dot yellow"></div>
+                        <div class="dot green"></div>
+                    </div>
+                </div>
+                <div style="padding: 1rem; background: var(--bg-light); border-radius: 0 0 12px 12px;">
+                    <div
+                        style="background: var(--bg-white); padding: 1.5rem; border-radius: 12px; border: 1px solid var(--border-color); position: relative;">
+                        <h4 style="color: var(--text-dark); margin-bottom: 1rem;">数学の問題</h4>
+                        <div
+                            style="border: 3px dashed var(--primary-color); background: rgba(59, 130, 246, 0.05); border-radius: 8px; padding: 1rem;">
+                            <p style="color: var(--text-medium); font-size: 1.1rem; margin: 0;">
+                                <strong>問題:</strong> ∫(x² + 2x + 1)dx を計算せよ
+                            </p>
+                        </div>
+                        <div
+                            style="background: var(--bg-white); border: 1px solid var(--primary-color); border-radius: 12px; padding: 1.5rem 1rem 1rem; margin-top: 1.5rem; position: relative; box-shadow: var(--shadow-sm);">
+                            <div
+                                style="position: absolute; top: -15px; left: 20px; background: linear-gradient(135deg, var(--primary-color), #1d4ed8); color: white; padding: 4px 12px; border-radius: 12px; font-size: 0.8rem; font-weight: 600;">
+                                🤖 AI Assistant</div>
+                            <p style="color: var(--text-dark); margin: 0.5rem 0 0 0; font-size: 1rem;">
+                                この積分を解いてみましょう！<br>
+                                ∫(x² + 2x + 1)dx = (x³/3) + x² + x + C<br>
+                                <span style="color: var(--text-light);">ステップバイステップで説明します...</span>
+                            </p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+
+        <!-- スライド 6: AIチャット機能デモ -->
+        <div class="slide" id="slide6" data-slide="6">
+            <h2 data-animation>いつでも頼れるAIチャット</h2>
+            <div
+                style="display: grid; grid-template-columns: 1fr 1.2fr; gap: 2.5rem; align-items: center; max-width: 1200px; width: 100%;">
+                <div style="display: grid; gap: 1.5rem;" data-animation style="transition-delay: 0.1s;">
+                    <div class="feature-card"
+                        style="margin: 0; background: linear-gradient(135deg, var(--secondary-color), #059669);">
+                        <i class="fas fa-image" style="color: white; -webkit-text-fill-color: white;"></i>
+                        <h4 style="color: white;">画像アップロード対応</h4>
+                        <p style="color: #dcfce7; text-align: left;">写真や図表も分析できます</p>
+                    </div>
+                    <div class="feature-card"
+                        style="margin: 0; background: linear-gradient(135deg, var(--accent-color), #d97706);">
+                        <i class="fas fa-history" style="color: white; -webkit-text-fill-color: white;"></i>
+                        <h4 style="color: white;">会話履歴保存</h4>
+                        <p style="color: #fef3c7; text-align: left;">過去の質問も覚えています</p>
+                    </div>
+                </div>
+                <div data-animation style="transition-delay: 0.2s;">
+                    <h3 style="color: var(--primary-color); margin-bottom: 1.5rem; text-align:left;">24時間、あなたの疑問に寄り添う
+                    </h3>
+                    <div
+                        style="background: var(--bg-light); border-radius: 16px; padding: 1.5rem; border: 1px solid var(--border-color);">
+                        <div
+                            style="background: var(--primary-color); color: white; padding: 0.8rem 1rem; border-radius: 12px 12px 4px 12px; margin: 0.5rem 0; float: right; clear: both; max-width: 80%; font-size: 0.9rem;">
+                            この英語の文章を日本語に翻訳してください
+                        </div>
+                        <div style="clear: both;"></div>
+                        <div
+                            style="background: var(--bg-white); color: var(--text-medium); padding: 0.8rem 1rem; border-radius: 12px 12px 12px 4px; margin: 1rem 0 0.5rem; float: left; clear: both; max-width: 85%; font-size: 0.9rem; border: 1px solid #d1d5db;">
+                            もちろんです！翻訳いたします。<br>
+                            画像でも文字でも大丈夫ですよ。
+                        </div>
+                        <div style="clear: both;"></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- スライド 7: 音声機能デモ -->
+        <div class="slide" id="slide7" data-slide="7">
+            <h2 data-animation>音声機能で、もっと自然な対話を</h2>
+            <div class="microphone-animation" data-animation style="transition-delay: 0.1s;">
+                <i class="fas fa-microphone-lines"></i>
+                <div class="wave"></div>
+                <div class="wave"></div>
+                <div class="wave"></div>
+            </div>
+            <h3 data-animation style="transition-delay: 0.2s; color: var(--primary-color);">話すだけで、疑問が解決します</h3>
+            <p data-animation style="transition-delay: 0.3s; max-width: 700px;">
+                まるで人と話すような自然な体験で、あなたの「知りたい」をサポート。ハンズフリーでの操作も可能です。
+            </p>
+        </div>
+
+        <!-- スライド 8: 学習シーンでの活用例 -->
+        <div class="slide" id="slide8" data-slide="8">
+            <h2 data-animation>学習効率が、劇的に変わる</h2>
+            <div class="content-grid">
+                <div data-animation
+                    style="transition-delay: 0.1s; background: linear-gradient(135deg, #3b82f6, #1d4ed8); padding: 2rem; border-radius: 16px; color: white;">
+                    <i class="fas fa-graduation-cap" style="font-size: 2.5rem; margin-bottom: 1rem;"></i>
+                    <h4 style="margin-bottom: 1rem; color: white;">勉強中の学生</h4>
+                    <p style="color: #dbeafe;">「数学の積分がわからない」→ 問題を囲むだけで、ステップ解説を表示。</p>
+                </div>
+                <div data-animation
+                    style="transition-delay: 0.2s; background: linear-gradient(135deg, #10b981, #059669); padding: 2rem; border-radius: 16px; color: white;">
+                    <i class="fas fa-language" style="font-size: 2.5rem; margin-bottom: 1rem;"></i>
+                    <h4 style="margin-bottom: 1rem; color: white;">語学学習者</h4>
+                    <p style="color: #dcfce7;">「この英語の文章の意味は？」→ キャプチャで翻訳・文法解説を即座に表示。</p>
+                </div>
+                <div data-animation
+                    style="transition-delay: 0.3s; background: linear-gradient(135deg, #f59e0b, #d97706); padding: 2rem; border-radius: 16px; color: white;">
+                    <i class="fas fa-code" style="font-size: 2.5rem; margin-bottom: 1rem;"></i>
+                    <h4 style="margin-bottom: 1rem; color: white;">プログラミング学習者</h4>
+                    <p style="color: #fef3c7;">「このエラーメッセージは何？」→ エラー画面を囲んで原因と解決策を解説。</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- スライド 9: 日常生活での活用例 -->
+        <div class="slide" id="slide9" data-slide="9">
+            <h2 data-animation>日常の「知りたい」も、瞬時に解決</h2>
+            <div class="content-grid">
+                <div class="feature-card" data-animation style="transition-delay: 0.1s;">
+                    <i class="fas fa-shopping-cart"></i>
+                    <h4>ネットショッピング</h4>
+                    <p>商品の詳細や口コミを囲んで「この商品はおすすめ？」と質問。</p>
+                </div>
+                <div class="feature-card" data-animation style="transition-delay: 0.2s;">
+                    <i class="fas fa-newspaper"></i>
+                    <h4>ニュース理解</h4>
+                    <p>難しいニュース記事を囲んで「3行で要約して」とお願い。</p>
+                </div>
+                <div class="feature-card" data-animation style="transition-delay: 0.3s;">
+                    <i class="fas fa-utensils"></i>
+                    <h4>レシピサイト</h4>
+                    <p>料理の手順を囲んで「この工程のコツは？」と質問。</p>
+                </div>
+                <div class="feature-card" data-animation style="transition-delay: 0.4s;">
+                    <i class="fas fa-plane"></i>
+                    <h4>旅行計画</h4>
+                    <p>観光地の情報を囲んで「ここの見どころは？」と質問。</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- スライド 10: 使用開始までの簡単ステップ -->
+        <div class="slide" id="slide10" data-slide="10">
+            <h2 data-animation>今すぐ始められる、簡単3ステップ</h2>
+            <div
+                style="display: flex; gap: 2rem; max-width: 1200px; width: 100%; margin: 3rem 0; justify-content: center; align-items: flex-start;">
+                <div style="text-align: center; max-width: 300px;" data-animation style="transition-delay: 0.1s;">
+                    <div
+                        style="width: 80px; height: 80px; background: linear-gradient(135deg, #3b82f6, #1d4ed8); border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 2rem; font-weight: bold; color: white; margin: 0 auto 1.5rem;">
+                        1</div>
+                    <h4 style="color: var(--text-dark); margin-bottom: 0.5rem; font-size: 1.4rem;">ブラウザでアクセス</h4>
+                    <p style="color: var(--text-light); font-size: 1rem; margin: 0;">お使いのブラウザで指定のURLにアクセスするだけ。</p>
+                </div>
+                <div style="color: #cbd5e1; font-size: 2rem; margin-top: 2rem;">→</div>
+                <div style="text-align: center; max-width: 300px;" data-animation style="transition-delay: 0.2s;">
+                    <div
+                        style="width: 80px; height: 80px; background: linear-gradient(135deg, #10b981, #059669); border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 2rem; font-weight: bold; color: white; margin: 0 auto 1.5rem;">
+                        2</div>
+                    <h4 style="color: var(--text-dark); margin-bottom: 0.5rem; font-size: 1.4rem;">AIチャットを開く</h4>
+                    <p style="color: var(--text-light); font-size: 1rem; margin: 0;">「AI質問」ボタンをクリックしてチャット画面を開きます。</p>
+                </div>
+                <div style="color: #cbd5e1; font-size: 2rem; margin-top: 2rem;">→</div>
+                <div style="text-align: center; max-width: 300px;" data-animation style="transition-delay: 0.3s;">
+                    <div
+                        style="width: 80px; height: 80px; background: linear-gradient(135deg, #f59e0b, #d97706); border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 2rem; font-weight: bold; color: white; margin: 0 auto 1.5rem;">
+                        3</div>
+                    <h4 style="color: var(--text-dark); margin-bottom: 0.5rem; font-size: 1.4rem;">すぐに使える！</h4>
+                    <p style="color: var(--text-light); font-size: 1rem; margin: 0;">特別な設定は一切不要。すぐに体験を開始できます。</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- スライド 11: 実際の操作画面 (iframe) -->
+        <div class="slide" id="slide11" data-slide="11">
+            <h2 data-animation>実際の操作画面をご覧ください</h2>
+            <div data-animation
+                style="transition-delay: 0.1s; width: 100%; max-width: 1200px; height: 70vh; border-radius: 20px; overflow: hidden; border: 1px solid var(--border-color); box-shadow: var(--shadow-lg);">
+                <iframe src="https://studyai.choko.cc" style="width: 100%; height: 100%; border: none;"
+                    title="AIBrowser Live Demo">
+                </iframe>
+            </div>
+            <p data-animation
+                style="transition-delay: 0.2s; color: var(--text-light); font-size: 1.1rem; margin-top: 2rem; text-align: center;">
+                右上の「AI質問」ボタンから、実際に体験してみてください！
+            </p>
+        </div>
+
+        <!-- スライド 12: まとめ・今すぐ試そう -->
+        <div class="slide" id="slide12" data-slide="12">
+            <h2 data-animation>AIBrowserで、学習革命を始めよう</h2>
+            <p class="subtitle" data-animation style="transition-delay: 0.1s;">あなたの学習体験を変える時が来ました。</p>
+            <div data-animation style="transition-delay: 0.2s; margin: 3rem 0;">
+                <a href="https://studyai.choko.cc" target="_blank" class="cta-button"
+                    style="font-size: 1.4rem; padding: 1.5rem 4rem;">
+                    <i class="fas fa-rocket"></i> 今すぐ無料で体験する
+                </a>
+            </div>
+            <div data-animation
+                style="transition-delay: 0.3s; background: linear-gradient(135deg, #1e293b, #0f172a); color: white; padding: 3rem; border-radius: 20px; margin-top: 3rem; text-align: center; max-width: 900px;">
+                <h3 style="color: var(--primary-color); margin-bottom: 1rem; font-size: 2rem;">
+                    <i class="fas fa-star"></i> 新しい学習の世界へ
+                </h3>
+                <p style="color: #cbd5e1; font-size: 1.3rem; margin:0;">
+                    AIBrowserと一緒に、これからのウェブスタンダードを体験しましょう。
+                </p>
+            </div>
+        </div>
+    </div>
+
+    <!-- Navigation UI -->
+    <div class="nav-arrow left" id="prev-arrow"><i class="fas fa-chevron-left"></i></div>
+    <div class="nav-arrow right" id="next-arrow"><i class="fas fa-chevron-right"></i></div>
+    <div class="progress-bar" id="progress-bar"></div>
+
+    <script>
+        class ModernPresentationController {
+            constructor() {
+                this.slides = document.querySelectorAll('.slide');
+                this.totalSlides = this.slides.length;
+                this.currentSlide = 1;
+
+                this.prevArrow = document.getElementById('prev-arrow');
+                this.nextArrow = document.getElementById('next-arrow');
+                this.progressBar = document.getElementById('progress-bar');
+
+                this.isTransitioning = false;
+                this.touchStartX = 0;
+
+                this.init();
+            }
+
+            init() {
+                this.bindEvents();
+                this.updateUI();
+                // Initial animation for the first slide
+                this.animateSlideContent(this.slides[0]);
+            }
+
+            bindEvents() {
+                // Arrow clicks
+                this.prevArrow.addEventListener('click', () => this.prevSlide());
+                this.nextArrow.addEventListener('click', () => this.nextSlide());
+
+                // Keyboard navigation
+                document.addEventListener('keydown', (e) => {
+                    if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') return;
+                    switch (e.key) {
+                        case 'ArrowLeft':
+                        case 'ArrowUp':
+                            this.prevSlide();
+                            break;
+                        case 'ArrowRight':
+                        case 'ArrowDown':
+                        case ' ':
+                            e.preventDefault();
+                            this.nextSlide();
+                            break;
+                        case 'Home':
+                            this.goToSlide(1);
+                            break;
+                        case 'End':
+                            this.goToSlide(this.totalSlides);
+                            break;
+                    }
+                });
+
+                // Touch/swipe navigation
+                document.addEventListener('touchstart', (e) => {
+                    this.touchStartX = e.touches[0].clientX;
+                }, { passive: true });
+
+                document.addEventListener('touchend', (e) => {
+                    const touchEndX = e.changedTouches[0].clientX;
+                    const deltaX = this.touchStartX - touchEndX;
+                    if (Math.abs(deltaX) > 50) {
+                        deltaX > 0 ? this.nextSlide() : this.prevSlide();
+                    }
+                }, { passive: true });
+            }
+
+            nextSlide() {
+                if (this.currentSlide < this.totalSlides) {
+                    this.goToSlide(this.currentSlide + 1);
+                }
+            }
+
+            prevSlide() {
+                if (this.currentSlide > 1) {
+                    this.goToSlide(this.currentSlide - 1);
+                }
+            }
+
+            goToSlide(slideNumber) {
+                if (slideNumber < 1 || slideNumber > this.totalSlides || slideNumber === this.currentSlide || this.isTransitioning) return;
+
+                this.isTransitioning = true;
+                const direction = slideNumber > this.currentSlide ? 'next' : 'prev';
+
+                const currentSlideEl = this.slides[this.currentSlide - 1];
+                const nextSlideEl = this.slides[slideNumber - 1];
+
+                // Set up classes for transition
+                this.slides.forEach(slide => slide.classList.remove('active', 'prev', 'next'));
+
+                currentSlideEl.classList.add(direction === 'next' ? 'prev' : 'next');
+                nextSlideEl.classList.add('active');
+
+                this.currentSlide = slideNumber;
+                this.updateUI();
+                this.animateSlideContent(nextSlideEl);
+
+                setTimeout(() => {
+                    this.isTransitioning = false;
+                }, 800);
+            }
+
+            animateSlideContent(slideEl) {
+                const elements = slideEl.querySelectorAll('[data-animation]');
+                elements.forEach((el, index) => {
+                    const delay = el.style.transitionDelay || '0s';
+                    setTimeout(() => {
+                        el.style.opacity = '1';
+                        el.style.transform = 'translateY(0)';
+                    }, parseFloat(delay) * 1000);
+                });
+            }
+
+            updateUI() {
+                // Update arrows
+                this.prevArrow.classList.toggle('hidden', this.currentSlide === 1);
+                this.nextArrow.classList.toggle('hidden', this.currentSlide === this.totalSlides);
+
+                // Update progress bar
+                const progress = (this.currentSlide / this.totalSlides) * 100;
+                this.progressBar.style.width = `${progress}%`;
+            }
+        }
+
+        document.addEventListener('DOMContentLoaded', () => {
+            window.presentation = new ModernPresentationController();
+        });
+    </script>
+</body>
+
+</html>
