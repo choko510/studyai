@@ -14,13 +14,13 @@
 
 <body>
   <div class="proxy-container">
-    <div class="url-bar">
-      <div class="nav-buttons">
+    <div class="url-bar">      <div class="nav-buttons">
         <button class="nav-btn" id="back-btn" onclick="goBack()" disabled>←</button>
         <button class="nav-btn" id="forward-btn" onclick="goForward()" disabled>→</button>
         <button class="nav-btn" id="refresh-btn" onclick="refresh()">⟲</button>
         <button class="nav-btn" id="ai-btn" onclick="openAIWithScreenshot()">AI質問</button>
         <button class="nav-btn" id="voice-demo-btn" onclick="openVoiceDemo()">音声デモ</button>
+        <button class="nav-btn" id="marker-mode-btn" onclick="toggleMarkerMode()" style="display: none;">囲むモード</button>
       </div>
       <input type="text" class="url-input" id="url-input" placeholder="URLまたは検索語句を入力...">
       <button class="go-btn" onclick="navigate()">移動</button>
@@ -95,6 +95,11 @@
       if (isSafari()) {
         console.warn('Safari: Service Worker機能が利用できません。');
       }
+    }    // モバイル端末検出関数
+    function isMobileDevice() {
+        return /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent) ||
+               (navigator.maxTouchPoints && navigator.maxTouchPoints > 2) ||
+               window.matchMedia('(max-width: 768px)').matches;
     }
 
     // iOS検出関数
@@ -102,6 +107,282 @@
         return /iPad|iPhone|iPod/.test(navigator.userAgent) ||
                (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
     }
+
+    // グローバル変数で囲むモードの状態を管理
+    let isMarkerModeEnabled = false;
+    let markerModeCanvas = null;    // 囲むモードの切り替え関数
+    function toggleMarkerMode() {
+        console.log('toggleMarkerMode called, current state:', isMarkerModeEnabled);
+        
+        isMarkerModeEnabled = !isMarkerModeEnabled;
+        const markerBtn = document.getElementById('marker-mode-btn');
+        
+        console.log('New state:', isMarkerModeEnabled);
+        console.log('Button element:', markerBtn);
+        
+        if (!markerBtn) {
+            console.error('マーカーボタンが見つかりません');
+            return;
+        }
+        
+        if (isMarkerModeEnabled) {
+            markerBtn.textContent = '囲むモード: オン';
+            markerBtn.style.background = '#10b981';
+            markerBtn.style.color = 'white';
+            enableMarkerMode();
+        } else {
+            markerBtn.textContent = '囲むモード';
+            markerBtn.style.background = '';
+            markerBtn.style.color = '';
+            disableMarkerMode();
+        }
+    }    // 囲むモードを有効にする
+    function enableMarkerMode() {
+        console.log('囲むモードを有効にしました');
+        // 既存のキャンバスがあれば削除
+        if (markerModeCanvas) {
+            markerModeCanvas.remove();
+            markerModeCanvas = null;
+        }
+        
+        // bodyにマーカーモードクラスを追加
+        document.body.classList.add('marker-mode-active');
+        
+        // 新しいキャンバスを作成
+        createMarkerModeCanvas();
+        
+        // フィードバックメッセージを表示
+        showMarkerFeedback('囲むモードがオンになりました。画面をタッチしてドラッグして範囲を囲んでください。', true);    }
+    
+    // 囲むモードを無効にする
+    function disableMarkerMode() {
+        console.log('囲むモードを無効にしました');
+        console.log('markerModeCanvas:', markerModeCanvas);
+        
+        if (markerModeCanvas) {
+            console.log('キャンバスを削除します');
+            markerModeCanvas.remove();
+            markerModeCanvas = null;
+        } else {
+            console.log('削除するキャンバスがありません');
+        }
+        
+        // bodyからマーカーモードクラスを削除
+        document.body.classList.remove('marker-mode-active');
+        
+        // フィードバックメッセージを表示
+        showMarkerFeedback('囲むモードがオフになりました。', false);
+    }// モバイル端末用のマーカーキャンバスを作成
+    function createMarkerModeCanvas() {
+        markerModeCanvas = document.createElement('canvas');
+        markerModeCanvas.style.position = 'fixed';
+        markerModeCanvas.style.top = '0';
+        markerModeCanvas.style.left = '0';
+        markerModeCanvas.style.pointerEvents = 'auto';
+        markerModeCanvas.style.zIndex = '9998'; // ボタンより下に設定
+        markerModeCanvas.style.cursor = 'crosshair';
+        markerModeCanvas.width = window.innerWidth;
+        markerModeCanvas.height = window.innerHeight;
+        markerModeCanvas.id = 'marker-mode-canvas';
+        document.body.appendChild(markerModeCanvas);
+
+        // ナビゲーションバーエリアではpointer-eventsを無効化
+        const urlBar = document.querySelector('.url-bar');
+        if (urlBar) {
+            urlBar.style.position = 'relative';
+            urlBar.style.zIndex = '10000'; // キャンバスより上に設定
+        }
+
+        const ctx = markerModeCanvas.getContext('2d');
+        const paintColor = 'red';
+        const brushSize = 3;
+        let isPainting = false;
+        let lastX = 0;
+        let lastY = 0;
+        let currentPath = [];
+
+        // ペイント設定
+        ctx.strokeStyle = paintColor;
+        ctx.lineWidth = brushSize;
+        ctx.lineCap = 'round';
+        ctx.lineJoin = 'round';        // タッチ開始イベント
+        markerModeCanvas.addEventListener('touchstart', (e) => {
+            // ボタンエリアかどうかをチェック
+            const touch = e.touches[0];
+            const element = document.elementFromPoint(touch.clientX, touch.clientY);
+            if (element && (element.classList.contains('nav-btn') || element.closest('.url-bar'))) {
+                // ボタンエリアの場合は何もしない（ボタンのクリックを優先）
+                return;
+            }
+            
+            e.preventDefault();
+            const rect = markerModeCanvas.getBoundingClientRect();
+            const x = touch.clientX - rect.left;
+            const y = touch.clientY - rect.top;
+            
+            // ナビゲーションバーエリア（上部80px）では反応しない
+            if (y < 80) {
+                return;
+            }
+            
+            isPainting = true;
+            lastX = x;
+            lastY = y;
+            
+            currentPath = [{x: x, y: y}];
+            ctx.beginPath();
+            ctx.moveTo(x, y);
+        });
+
+        // タッチ移動イベント
+        markerModeCanvas.addEventListener('touchmove', (e) => {
+            e.preventDefault();
+            if (!isPainting) return;
+            
+            const touch = e.touches[0];
+            const rect = markerModeCanvas.getBoundingClientRect();
+            const x = touch.clientX - rect.left;
+            const y = touch.clientY - rect.top;
+            
+            // ナビゲーションバーエリアでは描画しない
+            if (y < 80) {
+                return;
+            }
+            
+            currentPath.push({x: x, y: y});
+            ctx.lineTo(x, y);
+            ctx.stroke();
+            ctx.beginPath();
+            ctx.moveTo(x, y);
+        });
+
+        // タッチ終了イベント
+        markerModeCanvas.addEventListener('touchend', (e) => {
+            e.preventDefault();
+            if (!isPainting) return;
+            
+            isPainting = false;
+            
+            // パスが十分な長さかチェック
+            if (currentPath.length > 20) {
+                const isClosedShape = checkIfShapeIsClosed(currentPath);
+                
+                console.log('マーカー検出:', {
+                    pathLength: currentPath.length,
+                    isClosed: isClosedShape.isClosed,
+                    method: isClosedShape.method,
+                    details: isClosedShape.details,
+                    confidence: isClosedShape.confidence || 0
+                });
+                
+                if (isClosedShape.isClosed) {
+                    console.log(`マーカー範囲が検出されました！検出方法: ${isClosedShape.method} (信頼度: ${isClosedShape.confidence || 'N/A'})`);
+                    showMarkerConfirmDialog(document, currentPath, markerModeCanvas, ctx);
+                } else {
+                    console.log('マーカー範囲が検出されませんでした。理由:', isClosedShape.details);
+                    clearMarkerWithFeedback(ctx, markerModeCanvas, isClosedShape.details);
+                }
+            } else {
+                console.log('パスが短すぎます。長さ:', currentPath.length);
+                ctx.clearRect(0, 0, markerModeCanvas.width, markerModeCanvas.height);
+                showMarkerFeedback('線が短すぎます。もう少し長く囲んでください。', false);
+            }
+            
+            currentPath = [];
+            ctx.beginPath();
+        });        // マウスイベントも追加（デスクトップでも使用可能）
+        markerModeCanvas.addEventListener('mousedown', (e) => {
+            if (e.button === 0) { // 左クリック
+                // ボタンエリアかどうかをチェック
+                const element = document.elementFromPoint(e.clientX, e.clientY);
+                if (element && (element.classList.contains('nav-btn') || element.closest('.url-bar'))) {
+                    // ボタンエリアの場合は何もしない（ボタンのクリックを優先）
+                    return;
+                }
+                
+                const rect = markerModeCanvas.getBoundingClientRect();
+                const x = e.clientX - rect.left;
+                const y = e.clientY - rect.top;
+                
+                // ナビゲーションバーエリア（上部80px）では反応しない
+                if (y < 80) {
+                    return;
+                }
+                
+                isPainting = true;
+                lastX = x;
+                lastY = y;
+                
+                currentPath = [{x: lastX, y: lastY}];
+                ctx.beginPath();
+                ctx.moveTo(lastX, lastY);
+            }
+        });
+
+        markerModeCanvas.addEventListener('mousemove', (e) => {
+            if (!isPainting) return;
+            
+            const rect = markerModeCanvas.getBoundingClientRect();
+            const x = e.clientX - rect.left;
+            const y = e.clientY - rect.top;
+            
+            // ナビゲーションバーエリアでは描画しない
+            if (y < 80) {
+                return;
+            }
+            
+            currentPath.push({x: x, y: y});
+            ctx.lineTo(x, y);
+            ctx.stroke();
+            ctx.beginPath();
+            ctx.moveTo(x, y);
+        });
+
+        markerModeCanvas.addEventListener('mouseup', (e) => {
+            if (!isPainting) return;
+            
+            isPainting = false;
+            
+            // パスが十分な長さかチェック
+            if (currentPath.length > 20) {
+                const isClosedShape = checkIfShapeIsClosed(currentPath);
+                
+                console.log('マーカー検出:', {
+                    pathLength: currentPath.length,
+                    isClosed: isClosedShape.isClosed,
+                    method: isClosedShape.method,
+                    details: isClosedShape.details,
+                    confidence: isClosedShape.confidence || 0
+                });
+                
+                if (isClosedShape.isClosed) {
+                    console.log(`マーカー範囲が検出されました！検出方法: ${isClosedShape.method} (信頼度: ${isClosedShape.confidence || 'N/A'})`);
+                    showMarkerConfirmDialog(document, currentPath, markerModeCanvas, ctx);
+                } else {
+                    console.log('マーカー範囲が検出されませんでした。理由:', isClosedShape.details);
+                    clearMarkerWithFeedback(ctx, markerModeCanvas, isClosedShape.details);
+                }
+            } else {
+                console.log('パスが短すぎます。長さ:', currentPath.length);
+                ctx.clearRect(0, 0, markerModeCanvas.width, markerModeCanvas.height);
+                showMarkerFeedback('線が短すぎます。もう少し長く囲んでください。', false);
+            }
+            
+            currentPath = [];
+            ctx.beginPath();
+        });
+    }
+
+    // ページロード時にモバイル端末なら囲むボタンを表示
+    window.addEventListener('load', () => {
+        if (isMobileDevice()) {
+            const markerBtn = document.getElementById('marker-mode-btn');
+            if (markerBtn) {
+                markerBtn.style.display = 'inline-block';
+                console.log('モバイル端末を検出しました。囲むモードボタンを表示します。');
+            }
+        }
+    });
 
     // Safari検出関数
     function isSafari() {
@@ -347,9 +628,13 @@
         windows.forEach((element) => {
             element.style.display = '';
         });
-    }
-
-    function setupRightClickPaint(doc) {
+    }    function setupRightClickPaint(doc) {
+        // モバイル端末では右クリックペイント機能を無効化
+        if (isMobileDevice()) {
+            console.log('モバイル端末のため、右クリックペイント機能を無効化します。');
+            return;
+        }
+        
         const canvas = doc.createElement('canvas');
         canvas.style.position = 'fixed';
         canvas.style.top = '0';
@@ -462,35 +747,8 @@
             }
         });
 
-        // タッチデバイス対応
-        doc.addEventListener('touchstart', (e) => {
-            e.preventDefault();
-            const touch = e.touches[0];
-            const mouseEvent = new MouseEvent('mousedown', {
-                clientX: touch.clientX,
-                clientY: touch.clientY,
-                button: 2
-            });
-            doc.dispatchEvent(mouseEvent);
-        });
-
-        doc.addEventListener('touchend', (e) => {
-            e.preventDefault();
-            const mouseEvent = new MouseEvent('mouseup', {
-                button: 2
-            });
-            doc.dispatchEvent(mouseEvent);
-        });
-
-        doc.addEventListener('touchmove', (e) => {
-            e.preventDefault();
-            const touch = e.touches[0];
-            const mouseEvent = new MouseEvent('mousemove', {
-                clientX: touch.clientX,
-                clientY: touch.clientY
-            });
-            doc.dispatchEvent(mouseEvent);
-        });
+        // モバイル端末では従来のタッチイベントを削除
+        // タッチデバイス対応は新しい囲むモードで行う
     }
 
     // マーカー範囲確認ダイアログを表示
@@ -581,9 +839,7 @@
                 showMarkerFeedback('確認ダイアログがタイムアウトしました', false);
             }
         }, 8000);
-    }
-
-    // マーカーで囲まれた範囲をキャプチャしてAIに送信
+    }    // マーカーで囲まれた範囲をキャプチャしてAIに送信
     async function captureMarkedArea(doc, markerPath) {
         try {
             // 確認ダイアログを非表示にする（スクリーンショットに映り込まないように）
@@ -598,13 +854,24 @@
                 if (existingDialog) {
                     existingDialog.remove();
                 }
+                // 囲むモードも無効化
+                if (isMarkerModeEnabled) {
+                    toggleMarkerMode();
+                }
                 return;
             }
             
             // WinBoxウインドウを一時的に非表示
             const hiddenWindows = hideAllWinBoxWindows();
             
-            // 少し待ってからキャプチャを実行（ダイアログとWinBoxが完全に非表示になるまで）
+            // 囲むモードが有効な場合、キャンバスも一時的に非表示
+            let markerCanvasHidden = false;
+            if (markerModeCanvas && isMarkerModeEnabled) {
+                markerModeCanvas.style.display = 'none';
+                markerCanvasHidden = true;
+            }
+            
+            // 少し待ってからキャプチャを実行（ダイアログとWinBox、キャンバスが完全に非表示になるまで）
             await new Promise(resolve => setTimeout(resolve, 150));
 
             // マーカーパスのバウンディングボックスを計算
@@ -710,11 +977,28 @@
                 cropCanvas.toBlob((blob) => {
                     // キャプチャ完了後にWinBoxウインドウを再表示
                     showWinBoxWindows(hiddenWindows);
+                    
+                    // 隠したキャンバスを再表示
+                    if (markerCanvasHidden && markerModeCanvas) {
+                        markerModeCanvas.style.display = 'block';
+                    }
+                    
                     sendMarkedAreaToAI(blob);
+                    
+                    // 囲むモードを自動的にオフにする
+                    if (isMarkerModeEnabled) {
+                        toggleMarkerMode();
+                    }
                 });
             } else {
                 // WinBoxウインドウを再表示
                 showWinBoxWindows(hiddenWindows);
+                
+                // 隠したキャンバスを再表示
+                if (markerCanvasHidden && markerModeCanvas) {
+                    markerModeCanvas.style.display = 'block';
+                }
+                
                 alert('スクリーンキャプチャが有効ではありません。AIチャットでスクリーンキャプチャを有効にしてください。');
             }
             
@@ -728,11 +1012,15 @@
             if (typeof hiddenWindows !== 'undefined') {
                 showWinBoxWindows(hiddenWindows);
             }
+            
+            // 隠したキャンバスを再表示
+            if (typeof markerCanvasHidden !== 'undefined' && markerCanvasHidden && markerModeCanvas) {
+                markerModeCanvas.style.display = 'block';
+            }
+            
             alert('範囲のキャプチャに失敗しました。');
         }
-    }
-
-    // マーカーを消去してフィードバックを表示する関数
+    }    // マーカーを消去してフィードバックを表示する関数
     function clearMarkerWithFeedback(ctx, canvas, reason) {
         // マーカーを消去
         ctx.clearRect(0, 0, canvas.width, canvas.height);

@@ -115,8 +115,7 @@
                     StudyAIへようこそ！
                 </h2>
                 <p style="margin: 0; font-size: 16px; color: #6b7280; line-height: 1.6;">
-                    初回ご利用ありがとうございます。<br>
-                    基本的な使い方をチュートリアルで説明しますか？
+                    チュートリアルを開始しますか？
                 </p>
             </div>
             <div style="display: flex; gap: 12px; justify-content: center;">

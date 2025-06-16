@@ -20,6 +20,8 @@ body {
     display: flex;
     align-items: center;
     gap: 10px;
+    position: relative;
+    z-index: 10000;
 }
 
 .nav-buttons {
@@ -40,6 +42,7 @@ body {
     box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
     position: relative;
     overflow: hidden;
+    z-index: 10001;
 }
 
 .nav-btn:hover:not(:disabled) {
@@ -350,4 +353,27 @@ body {
 
 .wb-control:hover {
     background: rgba(255, 255, 255, 0.3) !important;
+}
+
+/* マーカーモードキャンバス用のスタイル */
+#marker-mode-canvas {
+    position: fixed;
+    top: 0;
+    left: 0;
+    z-index: 9998;
+    cursor: crosshair;
+    pointer-events: auto;
+    /* ナビゲーションバーエリアではpointer-eventsを無効化 */
+}
+
+/* マーカーモード時のナビゲーションエリア保護 */
+.marker-mode-active .url-bar {
+    position: relative;
+    z-index: 10000;
+    pointer-events: auto;
+}
+
+.marker-mode-active .nav-btn {
+    z-index: 10001;
+    pointer-events: auto;
 }
