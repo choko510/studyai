@@ -377,3 +377,86 @@ body {
     z-index: 10001;
     pointer-events: auto;
 }
+
+.voice-container {
+    font-family: sans-serif;
+    text-align: center;
+    padding: 20px;
+    background-color: #f4f4f9;
+    color: #333;
+    height: 100%;
+    box-sizing: border-box;
+}
+
+.voice-container h1 {
+    color: #444;
+    font-size: 18px;
+    margin: 0 0 10px 0;
+}
+
+.voice-container p {
+    font-size: 12px;
+    margin: 0 0 20px 0;
+}
+
+.voice-container button {
+    font-size: 14px;
+    padding: 8px 16px;
+    margin: 8px;
+    cursor: pointer;
+    border-radius: 5px;
+    border: none;
+    color: white;
+}
+
+.voice-container #connectButton {
+    background-color: #28a745;
+}
+
+.voice-container #disconnectButton {
+    background-color: #dc3545;
+}
+
+.voice-container button:disabled {
+    background-color: #6c757d;
+    cursor: not-allowed;
+}
+
+.voice-container #status {
+    margin-top: 15px;
+    font-size: 12px;
+    color: #555;
+    height: 30px;
+}
+
+.voice-container #volumeMeter {
+    width: 80%;
+    max-width: 400px;
+    height: 15px;
+    margin: 10px auto;
+    border: 1px solid #ccc;
+    background-color: #e9ecef;
+    border-radius: 5px;
+    overflow: hidden;
+}
+
+.voice-container #volumeLevel {
+    width: 0%;
+    height: 100%;
+    background-color: #17a2b8;
+    transition: width 0.1s;
+}
+
+.voice-container select {
+    padding: 4px 8px;
+    font-size: 12px;
+    border-radius: 3px;
+    border: 1px solid #ccc;
+    margin: 0 5px;
+}
+
+.voice-container #refreshMicsButton {
+    padding: 4px 8px;
+    background-color: #007bff;
+    font-size: 11px;
+}

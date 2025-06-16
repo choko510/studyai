@@ -10,7 +10,7 @@ self.__dynamic$config = {
 	tab: {
 		title: null,
 		icon: null,
-		ua: "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.3",
+		ua: "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/137.0.0.0 Safari/537.36",
 	},
 	assets: {
 		prefix: "/assets/history/",

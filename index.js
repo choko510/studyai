@@ -500,6 +500,33 @@ app.post("/api/text", async (req, res) => {
   }
 });
 
+// チャット履歴取得API
+app.get("/api/history/:sessionId", (req, res) => {
+  try {
+    const { sessionId } = req.params;
+    
+    if (!sessionId) {
+      return res.status(400).json({ error: "セッションIDが必要です" });
+    }
+    
+    // 会話履歴を取得
+    const history = getConversationHistory(sessionId);
+    
+    res.json({
+      sessionId,
+      messages: history,
+      count: history.length
+    });
+    
+  } catch (error) {
+    console.error("履歴取得エラー:", error);
+    res.status(500).json({
+      error: "履歴の取得中にエラーが発生しました",
+      details: error.message
+    });
+  }
+});
+
 // Backend設定取得API
 app.get("/api/config", (req, res) => {
   res.json({
@@ -519,6 +546,7 @@ app.use("/api/*", (req, res) => {
     availableEndpoints: [
       "POST /api/aireq - 画像解析（画像ファイルとオプションのプロンプトを送信）",
       "POST /api/text - テキストのみの質問（JSONで{\"message\": \"質問内容\"}を送信）",
+      "GET /api/history/:sessionId - 指定されたセッションの会話履歴を取得",
       "GET /api/config - Backend設定情報を取得"
     ]
   });

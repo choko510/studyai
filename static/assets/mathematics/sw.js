@@ -32,13 +32,47 @@ class UVServiceWorker extends EventEmitter {
       (this.method = { empty: ["GET", "HEAD"] }),
       (this.statusCode = { empty: [204, 304] }),
       (this.config = e),
+      (this.userAgent = this.getValidUserAgent()),
       (this.browser = Ultraviolet.Bowser.getParser(
-        self.navigator.userAgent,
+        this.userAgent,
       ).getBrowserName()),
       "Firefox" === this.browser &&
         (this.headers.forward.push("user-agent"),
         this.headers.forward.push("content-type"));
   }
+  getValidUserAgent() {
+    const defaultUserAgent = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/137.0.0.0 Safari/537.36";
+    
+    try {
+      const currentUserAgent = self.navigator.userAgent;
+      
+      // ユーザーエージェントが存在しない、空、または無効な形式の場合
+      if (!currentUserAgent ||
+          currentUserAgent.trim() === "" ||
+          currentUserAgent.length < 10 ||
+          !this.isValidUserAgent(currentUserAgent)) {
+        return defaultUserAgent;
+      }
+      
+      return currentUserAgent;
+    } catch (error) {
+      // ユーザーエージェントの取得に失敗した場合
+      return defaultUserAgent;
+    }
+  }
+  
+  isValidUserAgent(userAgent) {
+    // 基本的なユーザーエージェントの形式をチェック
+    const userAgentPattern = /Mozilla\/[\d\.]+ \([^)]+\)/;
+    const hasBasicStructure = userAgentPattern.test(userAgent);
+    
+    // 一般的なブラウザ名が含まれているかチェック
+    const commonBrowsers = ['Chrome', 'Firefox', 'Safari', 'Edge', 'Opera'];
+    const hasKnownBrowser = commonBrowsers.some(browser => userAgent.includes(browser));
+    
+    return hasBasicStructure || hasKnownBrowser;
+  }
+  
   async fetch({ request: e }) {
     if (!e.url.startsWith(location.origin + (this.config.prefix || "/service/")))
       return fetch(e);
